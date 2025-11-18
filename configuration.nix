@@ -93,6 +93,10 @@
   # Install firefox.
   programs.firefox.enable = true;
 
+  # Use ZSH
+  programs.zsh.enable = true;
+  users.defaultUserShell = pkgs.zsh;
+
   # Allow unfree packages
   nixpkgs.config.allowUnfree = true;
 
