@@ -3,6 +3,9 @@
 # and in the NixOS manual (accessible by running ‘nixos-help’).
 
 { config, pkgs, ... }:
+let 
+   unstable = import <unstable> { config.allowUnfree = true; };
+in
 
 {
   imports =
@@ -17,7 +20,7 @@
   # Use latest kernel.
   boot.kernelPackages = pkgs.linuxPackages_latest;
 
-  networking.hostName = "nixos"; # Define your hostname.
+  networking.hostName = "PX13"; # Define your hostname.
   # networking.wireless.enable = true;  # Enables wireless support via wpa_supplicant.
 
   # Configure network proxy if necessary
@@ -111,8 +114,14 @@
   ghostty
   fastfetch
   neofetch
-  code-cursor
+  unstable.code-cursor
   gh
+  spotify
+  dropbox
+  zoom-us
+  thunderbird
+  unstable.davinci-resolve-studio
+  unstable.darktable
   ];
 
   # Some programs need SUID wrappers, can be configured further or are
