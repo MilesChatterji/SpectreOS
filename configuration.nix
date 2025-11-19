@@ -114,7 +114,6 @@ in
   # $ nix search wget
   environment.systemPackages = with pkgs; [
   #  vim # Do not forget to add an editor to edit configuration.nix! The Nano editor is also installed by default.
-  #  wget
   neovim
   git
   wget
@@ -124,7 +123,7 @@ in
   unstable.code-cursor
   gh
   unstable.spotify
-  dropbox
+  dropbox-cli
   zoom-us
   thunderbird
   unstable.davinci-resolve-studio
@@ -132,9 +131,42 @@ in
   cmatrix
   btop
   cava
-  unstable.asusctl
   fwupd
+  protonmail-bridge
   ];
+
+  # Autostart systemd systemctl configs for apps that should open with other apps. 
+
+  # Autostart proton-bridge and make it availalbe to all email clients upon opening them.
+  systemd.services.protonmail-bridge = {
+  	description = "ProtonMail Bridge overlay";
+	wantedBy = [ "multi-user.target" ];
+	after = [ "network-online.target" ];
+	serviceConfig = { ExecStart = "${pkgs.protonmail-bridge} /bin/protonmail-bridge";
+			  Restart = "always";
+			  User = "miles";
+			  Group = "miles";
+	};
+   };
+
+  #Autostart dropbox to make it available in filebrowsers
+  systemd.user.services.dropbox = {
+    description = "Dropbox";
+    wantedBy = [ "graphical-session.target" ];
+    environment = {
+      QT_PLUGIN_PATH = "/run/current-system/sw/" + pkgs.qt5.qtbase.qtPluginPrefix;
+      QML2_IMPORT_PATH = "/run/current-system/sw/" + pkgs.qt5.qtbase.qtQmlPrefix;
+    };
+    serviceConfig = {
+      ExecStart = "${pkgs.dropbox}/bin/dropbox";
+      ExecReload = "${pkgs.coreutils}/bin/kill -HUP $MAINPID";
+      KillMode = "control-group"; # upstream recommends process
+      Restart = "on-failure";
+      PrivateTmp = true;
+      ProtectSystem = "full";
+      Nice = 10;
+    };
+  };
 
   # Some programs need SUID wrappers, can be configured further or are
   # started in user sessions.
@@ -150,8 +182,11 @@ in
   # services.openssh.enable = true;
 
   # Open ports in the firewall.
-  # networking.firewall.allowedTCPPorts = [ ... ];
-  # networking.firewall.allowedUDPPorts = [ ... ];
+  # Dropbox ports below.
+  networking.firewall = {
+    allowedTCPPorts = [ 17500 ];
+    allowedUDPPorts = [ 17500 ];
+  };
   # Or disable the firewall altogether.
   # networking.firewall.enable = false;
 
