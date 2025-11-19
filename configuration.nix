@@ -19,6 +19,13 @@ in
 
   # Use latest kernel.
   boot.kernelPackages = pkgs.linuxPackages_latest;
+  
+  #Asus specific firmware controllers
+  services.fwupd.enable = true;
+  hardware.enableAllFirmware = true;
+
+  #enable flatpak for 3rd party software containers
+  services.flatpak.enable = true;
 
   networking.hostName = "PX13"; # Define your hostname.
   # networking.wireless.enable = true;  # Enables wireless support via wpa_supplicant.
@@ -116,12 +123,17 @@ in
   neofetch
   unstable.code-cursor
   gh
-  spotify
+  unstable.spotify
   dropbox
   zoom-us
   thunderbird
   unstable.davinci-resolve-studio
   unstable.darktable
+  cmatrix
+  btop
+  cava
+  unstable.asusctl
+  fwupd
   ];
 
   # Some programs need SUID wrappers, can be configured further or are
