@@ -11,6 +11,8 @@ in
   imports =
     [ # Include the results of the hardware scan.
       ./hardware-configuration.nix
+      # ASUS specific hardware configuration
+      ./asus-dialpad.nix
     ];
 
   # Bootloader.
@@ -133,22 +135,24 @@ in
   cava
   fwupd
   protonmail-bridge
+  busybox
+  gimp
   ];
 
   # Autostart systemd systemctl configs for apps that should open with other apps. 
 
   # Autostart proton-bridge and make it availalbe to all email clients upon opening them.
-  systemd.user.services.protonmail-bridge = {
-    description = "ProtonMail Bridge overlay";
-    wantedBy = [ "graphical-session.target" ];
-    after = [ "network-online.target" "graphical-session.target" ];
-    serviceConfig = {
-      ExecStart = "${pkgs.protonmail-bridge}/bin/protonmail-bridge";
-      Restart = "always";
-      RestartSec = 10;
-    };
-  };
-
+  systemd.services.protonmail-bridge = {
+  	description = "ProtonMail Bridge overlay";
+	wantedBy = [ "multi-user.target" ];
+	after = [ "network-online.target" ];
+	serviceConfig = { ExecStart = "${pkgs.protonmail-bridge} /bin/protonmail-bridge";
+			  Restart = "always";
+			  User = "miles";
+              		  Group = "miles";
+	};
+   };
+  
   #Autostart dropbox to make it available in filebrowsers
   systemd.user.services.dropbox = {
     description = "Dropbox";
