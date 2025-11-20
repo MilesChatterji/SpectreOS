@@ -138,16 +138,16 @@ in
   # Autostart systemd systemctl configs for apps that should open with other apps. 
 
   # Autostart proton-bridge and make it availalbe to all email clients upon opening them.
-  systemd.services.protonmail-bridge = {
-  	description = "ProtonMail Bridge overlay";
-	wantedBy = [ "multi-user.target" ];
-	after = [ "network-online.target" ];
-	serviceConfig = { ExecStart = "${pkgs.protonmail-bridge} /bin/protonmail-bridge";
-			  Restart = "always";
-			  User = "miles";
-			  Group = "miles";
-	};
-   };
+  systemd.user.services.protonmail-bridge = {
+    description = "ProtonMail Bridge overlay";
+    wantedBy = [ "graphical-session.target" ];
+    after = [ "network-online.target" "graphical-session.target" ];
+    serviceConfig = {
+      ExecStart = "${pkgs.protonmail-bridge}/bin/protonmail-bridge";
+      Restart = "always";
+      RestartSec = 10;
+    };
+  };
 
   #Autostart dropbox to make it available in filebrowsers
   systemd.user.services.dropbox = {
