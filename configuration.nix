@@ -136,7 +136,12 @@ in
   fwupd
   protonmail-bridge
   busybox
-  gimp
+  gimp3
+  yazi
+  fzf
+  unstable.omnissa-horizon-client
+  signal-desktop
+  signal-cli
   ];
 
   # Autostart systemd systemctl configs for apps that should open with other apps. 
