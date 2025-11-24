@@ -13,6 +13,8 @@ in
       ./hardware-configuration.nix
       # ASUS specific hardware configuration
       ./asus-dialpad.nix
+      #import Niri WM
+      ./niri.nix
     ];
 
   # Bootloader.
@@ -142,6 +144,12 @@ in
   unstable.omnissa-horizon-client
   signal-desktop
   signal-cli
+  wofi
+  lshw
+  rustc
+  cargo
+  pkg-config
+  unstable.quickshell
   ];
 
   # Autostart systemd systemctl configs for apps that should open with other apps. 
