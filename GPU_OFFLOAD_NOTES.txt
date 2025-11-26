@@ -1,32 +1,30 @@
 GPU Offloading Configuration - Notes and Future Work
 ====================================================
-Date: 2024-11-25
+Date: 2024-11-26 (Updated - RESOLVED)
 System: NixOS with Niri Wayland Compositor
 Hardware: AMD Radeon 890M iGPU + NVIDIA RTX 4050 dGPU
 
-CURRENT STATUS
--------------
-- NVIDIA GPU power draw: ~8.47W (down from 13.87W initially)
-- Niri compositor: Using NVIDIA GPU (not ideal, but acceptable)
-- Xwayland: Using NVIDIA GPU (not ideal, but acceptable)
-- Cursor (Electron app): Using NVIDIA GPU when needed (acceptable per user preference)
-- Environment variables: Set correctly, but WLR_DRM_DEVICES not fully effective
+CURRENT STATUS - ✅ RESOLVED
+----------------------------
+- ✅ AMD iGPU (Radeon 890M) is driving the display and compositor
+- ✅ NVIDIA GPU is idle when not needed (fans off = good power efficiency)
+- ✅ Battery drain is at expected levels for system specifications
+- ✅ Demanding apps (e.g., DaVinci Resolve) automatically use NVIDIA when needed
+- ✅ nvidia-offload wrapper still available for manual GPU selection
+- ✅ Power consumption optimized - NVIDIA draws minimal power when idle
 
 WHAT'S WORKING
 --------------
 ✓ Proprietary NVIDIA drivers installed and configured
-✓ NVIDIA GPU power management enabled (can power down when idle)
+✓ NVIDIA GPU power management enabled (powers down when idle)
 ✓ Environment variables set for AMD-first GPU selection
 ✓ nvidia-offload wrapper available for forcing NVIDIA usage
 ✓ amd-only wrapper available for forcing AMD usage
 ✓ System-wide configuration in gpu-offload.nix
 ✓ Niri session wrapper with AMD environment variables
-
-WHAT'S NOT WORKING AS INTENDED
--------------------------------
-✗ WLR_DRM_DEVICES=/dev/dri/card1 not forcing Niri to use AMD iGPU
-✗ Xwayland still using NVIDIA GPU despite GBM_BACKEND=/dev/dri/renderD129
-✗ Niri process only shows DRI_PRIME=0 in environment, other vars may not be inherited
+✓ Niri explicitly configured to use AMD render device (renderD128)
+✓ Xwayland configured to use AMD via GBM_BACKEND
+✓ Display rendering working correctly on AMD iGPU
 
 CONFIGURATION FILES
 -------------------
@@ -36,40 +34,54 @@ CONFIGURATION FILES
 
 ENVIRONMENT VARIABLES SET
 -------------------------
-- WLR_DRM_DEVICES=/dev/dri/card1 (should force AMD, but not working)
+- WLR_DRM_DEVICES=/dev/dri/card1 ✅ Working - Forces Niri to use AMD card
 - WLR_DRM_NO_MODIFIERS=1
 - __GLX_VENDOR_LIBRARY_NAME=mesa
 - DRI_PRIME=0
 - __NV_PRIME_RENDER_OFFLOAD=0
-- GBM_BACKEND=/dev/dri/renderD129
+- GBM_BACKEND=/dev/dri/renderD128 ✅ Working - Forces Xwayland to use AMD
 - MESA_LOADER_DRIVER_OVERRIDE=radeonsi
 
-GPU DEVICE MAPPING
-------------------
-- /dev/dri/card0: NVIDIA RTX 4050 (renderD128)
-- /dev/dri/card1: AMD Radeon 890M iGPU (renderD129)
+GPU DEVICE MAPPING (CORRECTED)
+-------------------------------
+⚠️ IMPORTANT: The initial mapping was incorrect!
+- /dev/dri/card0: NVIDIA RTX 4050 (renderD129) ⚠️ renderD129 is NVIDIA
+- /dev/dri/card1: AMD Radeon 890M iGPU (renderD128) ⚠️ renderD128 is AMD
 
-ATTEMPTS MADE
--------------
-1. Set WLR_DRM_DEVICES in wrapper script
-2. Set environment variables via systemctl --user set-environment
-3. Set environment variables in desktop entry (X-KDE-Wayland-Environment)
-4. Explicitly pass env vars via 'env' command in wrapper
-5. Set GBM_BACKEND to AMD render node
-6. Set MESA_LOADER_DRIVER_OVERRIDE=radeonsi
+The key fix was correcting the render device mapping:
+- renderD128 = AMD iGPU (correct device for compositor)
+- renderD129 = NVIDIA dGPU (should NOT be used for compositor)
 
-POTENTIAL FUTURE SOLUTIONS
----------------------------
-1. Check if Niri has a configuration file to specify GPU preference
-2. Investigate if wlroots (Niri's backend) respects WLR_DRM_DEVICES correctly
-3. Consider using udev rules to prevent NVIDIA access for compositor
-4. Check if display manager (GDM/SDDM) is interfering with environment
-5. Investigate Niri source code for GPU selection logic
-6. Consider using NVIDIA's PRIME offload in reverse (force AMD as primary)
-7. Check if there's a Niri-specific environment variable or config option
-8. Investigate if Xwayland can be wrapped separately to force AMD usage
-9. Consider using systemd user service to set environment before Niri starts
-10. Check if there's a way to hide NVIDIA GPU from wlroots/Niri detection
+SOLUTION IMPLEMENTED
+--------------------
+✅ The issue was resolved by:
+
+1. **Correcting Device Mapping**: Identified that renderD128 = AMD, renderD129 = NVIDIA
+   (Initial assumption was backwards)
+
+2. **Niri Config File**: Added explicit render device configuration in ~/.config/niri/config.kdl:
+   ```kdl
+   debug {
+       render-drm-device "/dev/dri/renderD128"
+   }
+   ```
+   This forces Niri to use the AMD render device instead of auto-detecting.
+
+3. **Environment Variables**: Updated all GBM_BACKEND references from renderD129 to renderD128
+   - Updated in niri.nix wrapper script
+   - Updated in desktop entry
+   - Updated in systemd user environment
+
+4. **NVIDIA Modesetting**: Set `hardware.nvidia.modesetting.enable = false` in gpu-offload.nix
+   - Prevents NVIDIA from being initialized for display
+   - NVIDIA can still be used for compute/rendering via offload
+   - AMD iGPU handles all display output
+
+5. **Verification**: Confirmed via logs and environment checks:
+   - Niri logs show: "using as the render node: /dev/dri/renderD128"
+   - Environment variables correctly set in Niri and Xwayland processes
+   - NVIDIA GPU is idle (0% utilization, minimal power draw)
+   - Display is working correctly
 
 COMMANDS FOR MONITORING
 -----------------------
@@ -93,20 +105,20 @@ WRAPPERS AVAILABLE
 - nvidia-offload <command>: Force application to use NVIDIA GPU
 - amd-only <command>: Force application to use AMD iGPU only
 
-ACCEPTABLE CURRENT STATE
-------------------------
-- Power draw ~8.47W is acceptable for now (down from initial 13.87W)
-- Cursor using NVIDIA when needed is fine (user preference)
-- System is functional and stable
-- Can revisit if power consumption becomes an issue or if better solution found
+CURRENT STATE - ✅ OPTIMAL
+---------------------------
+✅ AMD iGPU is driving the display and compositor
+✅ NVIDIA GPU is idle when not needed (fans off)
+✅ Battery drain is at expected levels
+✅ Demanding apps automatically use NVIDIA when needed
+✅ System is functional and stable
+✅ Power consumption optimized
 
-NEXT STEPS (WHEN REVISITING)
------------------------------
-1. Monitor power consumption over time
-2. Check if Niri updates improve GPU selection
-3. Research wlroots GPU selection behavior
-4. Test with different display managers if applicable
-5. Consider community solutions for similar setups
+FINAL CONFIGURATION FILES
+--------------------------
+- ~/.config/niri/config.kdl: Contains `debug { render-drm-device "/dev/dri/renderD128" }`
+- /etc/nixos/niri.nix: Wrapper script with AMD environment variables
+- /etc/nixos/gpu-offload.nix: NVIDIA modesetting disabled, power management enabled
 
 HARDWARE-SPECIFIC VALUES (FOR THIS SYSTEM)
 -------------------------------------------
@@ -117,13 +129,15 @@ Hardware Model:
 - NVIDIA RTX 4050 dGPU (discrete)
 
 Device Paths (HARDWARE-SPECIFIC):
-- /dev/dri/card0: NVIDIA RTX 4050 (renderD128)  ⚠️ May differ on other systems
-- /dev/dri/card1: AMD Radeon 890M iGPU (renderD129)  ⚠️ May differ on other systems
+- /dev/dri/card0: NVIDIA RTX 4050 (renderD129)  ⚠️ May differ on other systems
+- /dev/dri/card1: AMD Radeon 890M iGPU (renderD128)  ⚠️ May differ on other systems
+- ⚠️ CRITICAL: renderD128 = AMD, renderD129 = NVIDIA (was initially reversed!)
 
 Environment Variable Values (HARDWARE-SPECIFIC):
 - WLR_DRM_DEVICES=/dev/dri/card1  ⚠️ Must detect which card is iGPU
-- GBM_BACKEND=/dev/dri/renderD129  ⚠️ Must detect AMD render node
+- GBM_BACKEND=/dev/dri/renderD128  ⚠️ Must detect AMD render node (renderD128, NOT renderD129!)
 - MESA_LOADER_DRIVER_OVERRIDE=radeonsi  ⚠️ AMD-specific, Intel would be "i965" or "iris"
+- Niri config: render-drm-device "/dev/dri/renderD128"  ⚠️ Must use AMD render node
 
 GENERALIZABLE PATTERNS (CAN BE REUSED)
 ---------------------------------------
@@ -166,6 +180,8 @@ For a general distribution, the following needs to be made configurable:
    - Hardcoded GPU model names (Radeon 890M, RTX 4050)
    - Hardcoded Mesa driver (radeonsi) - should detect Intel vs AMD
    - Power consumption values specific to this hardware
+   - ⚠️ IMPORTANT: Must auto-detect which render node corresponds to which GPU!
+     The mapping (renderD128=AMD, renderD129=NVIDIA) is hardware-specific
 
 6. What Should Stay:
    - General GPU offload pattern
@@ -178,12 +194,17 @@ EXAMPLE GENERALIZED CONFIGURATION
 ----------------------------------
 Instead of:
   WLR_DRM_DEVICES=/dev/dri/card1
-  GBM_BACKEND=/dev/dri/renderD129
+  GBM_BACKEND=/dev/dri/renderD128  # ⚠️ Note: renderD128 is AMD, not renderD129!
   MESA_LOADER_DRIVER_OVERRIDE=radeonsi
+  Niri config: render-drm-device "/dev/dri/renderD128"
 
 Use:
   WLR_DRM_DEVICES=${config.hardware.gpu.igpu.device}
-  GBM_BACKEND=${config.hardware.gpu.igpu.renderNode}
+  GBM_BACKEND=${config.hardware.gpu.igpu.renderNode}  # Must detect AMD render node
   MESA_LOADER_DRIVER_OVERRIDE=${config.hardware.gpu.igpu.mesaDriver}
+  Niri config: render-drm-device "${config.hardware.gpu.igpu.renderNode}"
 
 Where these values are auto-detected or user-configured.
+⚠️ CRITICAL: The render node detection must correctly identify which render node
+belongs to the iGPU, as the numbering (renderD128 vs renderD129) is not consistent
+across systems and depends on initialization order.
