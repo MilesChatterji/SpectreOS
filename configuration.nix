@@ -111,11 +111,13 @@ in
   # Enable touchpad support (enabled default in most desktopManager).
   # services.xserver.libinput.enable = true;
 
-  # Define a user account. Don't forget to set a password with ‘passwd’.
+  # Define a user account. Don't forget to set a password with 'passwd'.
   users.users.miles = {
     isNormalUser = true;
     description = "Miles Chatterji";
-    extraGroups = [ "networkmanager" "wheel" ];
+    # All groups: networkmanager (networking), wheel (sudo), video/render (GPU access), 
+    # uinput/input/i2c (ASUS DialPad hardware access)
+    extraGroups = [ "networkmanager" "wheel" "video" "render" "uinput" "input" "i2c" ];
     packages = with pkgs; [
     #  thunderbird
     ];
@@ -153,7 +155,6 @@ in
   btop
   cava
   fwupd
-  protonmail-bridge
   busybox
   gimp3
   yazi
@@ -167,21 +168,12 @@ in
   cargo
   pkg-config
   unstable.quickshell
+  fuzzel
   ];
 
   # Autostart systemd systemctl configs for apps that should open with other apps. 
 
   # Autostart proton-bridge and make it availalbe to all email clients upon opening them.
-  systemd.services.protonmail-bridge = {
-  	description = "ProtonMail Bridge overlay";
-	wantedBy = [ "multi-user.target" ];
-	after = [ "network-online.target" ];
-	serviceConfig = { ExecStart = "${pkgs.protonmail-bridge} /bin/protonmail-bridge";
-			  Restart = "always";
-			  User = "miles";
-              		  Group = "miles";
-	};
-   };
   
   #Autostart dropbox to make it available in filebrowsers
   systemd.user.services.dropbox = {

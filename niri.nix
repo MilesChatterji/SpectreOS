@@ -34,12 +34,12 @@ let
     # The other environment variables (DRI_PRIME, __GLX_VENDOR_LIBRARY_NAME) will guide GPU selection
     # This allows applications to find the right drivers while preferring AMD
     
-    # Force Xwayland to use AMD iGPU (card1/renderD129)
+    # Force Xwayland to use AMD iGPU (card1/renderD128)
     # Xwayland is launched by Niri and should inherit WLR_DRM_DEVICES
     # But we'll be explicit to ensure it uses AMD
-    # renderD129 is AMD iGPU, renderD128 is NVIDIA
+    # renderD128 is AMD iGPU, renderD129 is NVIDIA
     # Setting GBM_BACKEND to AMD's render node device path forces Xwayland to use AMD
-    export GBM_BACKEND=/dev/dri/renderD129
+    export GBM_BACKEND=/dev/dri/renderD128
     # Ensure Xwayland uses hardware acceleration on AMD (not software rendering)
     export LIBGL_ALWAYS_SOFTWARE=0
     # Force Mesa to use AMD driver (radeonsi is the modern AMD driver)
@@ -63,7 +63,7 @@ let
     systemctl --user set-environment DRI_PRIME=0
     systemctl --user set-environment __NV_PRIME_RENDER_OFFLOAD=0
     # Force Xwayland to use AMD iGPU
-    systemctl --user set-environment GBM_BACKEND=/dev/dri/renderD129
+    systemctl --user set-environment GBM_BACKEND=/dev/dri/renderD128
     systemctl --user set-environment MESA_LOADER_DRIVER_OVERRIDE=radeonsi
     
     # Launch niri-session with AMD iGPU
@@ -74,7 +74,7 @@ let
             __GLX_VENDOR_LIBRARY_NAME=mesa \
             DRI_PRIME=0 \
             __NV_PRIME_RENDER_OFFLOAD=0 \
-            GBM_BACKEND=/dev/dri/renderD129 \
+            GBM_BACKEND=/dev/dri/renderD128 \
             MESA_LOADER_DRIVER_OVERRIDE=radeonsi \
             ${pkgs.niri}/bin/niri-session "$@"
   '';
@@ -88,7 +88,7 @@ let
     Exec=${niri-amd-wrapper}/bin/niri-session-amd
     Type=Application
     DesktopNames=niri
-    X-KDE-Wayland-Environment=WLR_DRM_DEVICES=/dev/dri/card1;WLR_DRM_NO_MODIFIERS=1;__GLX_VENDOR_LIBRARY_NAME=mesa;DRI_PRIME=0;__NV_PRIME_RENDER_OFFLOAD=0;__VK_LAYER_NV_optimus=;GBM_BACKEND=/dev/dri/renderD129;MESA_LOADER_DRIVER_OVERRIDE=radeonsi
+    X-KDE-Wayland-Environment=WLR_DRM_DEVICES=/dev/dri/card1;WLR_DRM_NO_MODIFIERS=1;__GLX_VENDOR_LIBRARY_NAME=mesa;DRI_PRIME=0;__NV_PRIME_RENDER_OFFLOAD=0;__VK_LAYER_NV_optimus=;GBM_BACKEND=/dev/dri/renderD128;MESA_LOADER_DRIVER_OVERRIDE=radeonsi
   '';
   
   # Noctalia Shell - using official package.nix approach

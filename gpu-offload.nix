@@ -74,8 +74,12 @@ in
     # Use proprietary drivers, not open-source nouveau
     open = false;
     
-    # Enable modesetting (required for Wayland and better power management)
-    modesetting.enable = true;
+    # Disable modesetting to prevent NVIDIA from being initialized for display
+    # This forces Wayland compositors (Niri) to use AMD iGPU for the internal display
+    # NVIDIA can still be used for compute/rendering via nvidia-offload (PRIME offload)
+    # Testing: GNOME may still work, but if it breaks, rollback with: nixos-rebuild switch --rollback
+    # This should reduce power consumption in Niri and fix brightness controls
+    modesetting.enable = false;
     
     # Enable power management (allows GPU to power down when not in use)
     powerManagement.enable = true;

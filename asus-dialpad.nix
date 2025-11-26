@@ -88,10 +88,8 @@ in
     i2c = { };
   };
 
-  # Add user to DialPad groups (merged with existing groups from configuration.nix)
-  users.users.miles = {
-    extraGroups = [ "uinput" "input" "i2c" ];
-  };
+  # Note: User groups (uinput, input, i2c) are now defined in configuration.nix
+  # to avoid conflicts. The groups are merged there with other user groups.
 
   # Add ASUS DialPad Driver to system packages
   environment.systemPackages = [ asus-dialpad-driver ];
@@ -105,18 +103,24 @@ in
     after = [ "graphical-session.target" ];
     serviceConfig = {
       Type = "simple";
+      # Wait for Wayland display to be available before starting
+      # This script checks for WAYLAND_DISPLAY in the session environment and verifies the socket exists
+      ExecStartPre = "${pkgs.bash}/bin/bash -c 'while [ -z \"$WAYLAND_DISPLAY\" ] || [ ! -S \"$XDG_RUNTIME_DIR/$WAYLAND_DISPLAY\" ]; do sleep 0.5; done; echo \"Wayland display ready: $WAYLAND_DISPLAY\"'";
       ExecStart = "${asus-dialpad-driver}/bin/asus-dialpad-driver proartp16";
       WorkingDirectory = "${asus-dialpad-driver}/share/asus-dialpad-driver";
       Restart = "on-failure";
       RestartSec = 5;
       StandardOutput = "journal";
       StandardError = "journal";
+      # Don't hardcode WAYLAND_DISPLAY - let it inherit from the session environment
+      # The actual display name (wayland-0, wayland-1, etc.) varies by session
       Environment = [
         "XDG_SESSION_TYPE=wayland"
-        "WAYLAND_DISPLAY=wayland-0"
         "LOG=WARNING"
         "HOME=%h"
       ];
+      # Pass through environment from the session (including WAYLAND_DISPLAY)
+      PassEnvironment = [ "WAYLAND_DISPLAY" "XDG_RUNTIME_DIR" "XDG_SESSION_TYPE" ];
     };
   };
 }
