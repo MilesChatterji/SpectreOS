@@ -1,0 +1,189 @@
+GPU Offloading Configuration - Notes and Future Work
+====================================================
+Date: 2024-11-25
+System: NixOS with Niri Wayland Compositor
+Hardware: AMD Radeon 890M iGPU + NVIDIA RTX 4050 dGPU
+
+CURRENT STATUS
+-------------
+- NVIDIA GPU power draw: ~8.47W (down from 13.87W initially)
+- Niri compositor: Using NVIDIA GPU (not ideal, but acceptable)
+- Xwayland: Using NVIDIA GPU (not ideal, but acceptable)
+- Cursor (Electron app): Using NVIDIA GPU when needed (acceptable per user preference)
+- Environment variables: Set correctly, but WLR_DRM_DEVICES not fully effective
+
+WHAT'S WORKING
+--------------
+✓ Proprietary NVIDIA drivers installed and configured
+✓ NVIDIA GPU power management enabled (can power down when idle)
+✓ Environment variables set for AMD-first GPU selection
+✓ nvidia-offload wrapper available for forcing NVIDIA usage
+✓ amd-only wrapper available for forcing AMD usage
+✓ System-wide configuration in gpu-offload.nix
+✓ Niri session wrapper with AMD environment variables
+
+WHAT'S NOT WORKING AS INTENDED
+-------------------------------
+✗ WLR_DRM_DEVICES=/dev/dri/card1 not forcing Niri to use AMD iGPU
+✗ Xwayland still using NVIDIA GPU despite GBM_BACKEND=/dev/dri/renderD129
+✗ Niri process only shows DRI_PRIME=0 in environment, other vars may not be inherited
+
+CONFIGURATION FILES
+-------------------
+- /etc/nixos/gpu-offload.nix: System-wide GPU configuration
+- /etc/nixos/niri.nix: Niri-specific GPU configuration with AMD wrapper
+- /etc/nixos/configuration.nix: Imports both above files
+
+ENVIRONMENT VARIABLES SET
+-------------------------
+- WLR_DRM_DEVICES=/dev/dri/card1 (should force AMD, but not working)
+- WLR_DRM_NO_MODIFIERS=1
+- __GLX_VENDOR_LIBRARY_NAME=mesa
+- DRI_PRIME=0
+- __NV_PRIME_RENDER_OFFLOAD=0
+- GBM_BACKEND=/dev/dri/renderD129
+- MESA_LOADER_DRIVER_OVERRIDE=radeonsi
+
+GPU DEVICE MAPPING
+------------------
+- /dev/dri/card0: NVIDIA RTX 4050 (renderD128)
+- /dev/dri/card1: AMD Radeon 890M iGPU (renderD129)
+
+ATTEMPTS MADE
+-------------
+1. Set WLR_DRM_DEVICES in wrapper script
+2. Set environment variables via systemctl --user set-environment
+3. Set environment variables in desktop entry (X-KDE-Wayland-Environment)
+4. Explicitly pass env vars via 'env' command in wrapper
+5. Set GBM_BACKEND to AMD render node
+6. Set MESA_LOADER_DRIVER_OVERRIDE=radeonsi
+
+POTENTIAL FUTURE SOLUTIONS
+---------------------------
+1. Check if Niri has a configuration file to specify GPU preference
+2. Investigate if wlroots (Niri's backend) respects WLR_DRM_DEVICES correctly
+3. Consider using udev rules to prevent NVIDIA access for compositor
+4. Check if display manager (GDM/SDDM) is interfering with environment
+5. Investigate Niri source code for GPU selection logic
+6. Consider using NVIDIA's PRIME offload in reverse (force AMD as primary)
+7. Check if there's a Niri-specific environment variable or config option
+8. Investigate if Xwayland can be wrapped separately to force AMD usage
+9. Consider using systemd user service to set environment before Niri starts
+10. Check if there's a way to hide NVIDIA GPU from wlroots/Niri detection
+
+COMMANDS FOR MONITORING
+-----------------------
+# Check NVIDIA GPU usage
+nvidia-smi pmon -c 1
+
+# Check NVIDIA GPU power
+nvidia-smi --query-gpu=power.draw --format=csv,noheader
+
+# Check systemd user environment
+systemctl --user show-environment | grep -E "(WLR|GBM|MESA|DRI)"
+
+# Check process environment
+ps e -p $(pgrep -f niri-session | head -1) | tr ' ' '\n' | grep -E "(WLR|GBM|MESA|DRI)"
+
+# Check active GPU processes
+nvidia-smi --query-compute-apps=pid,process_name,used_memory --format=csv,noheader
+
+WRAPPERS AVAILABLE
+------------------
+- nvidia-offload <command>: Force application to use NVIDIA GPU
+- amd-only <command>: Force application to use AMD iGPU only
+
+ACCEPTABLE CURRENT STATE
+------------------------
+- Power draw ~8.47W is acceptable for now (down from initial 13.87W)
+- Cursor using NVIDIA when needed is fine (user preference)
+- System is functional and stable
+- Can revisit if power consumption becomes an issue or if better solution found
+
+NEXT STEPS (WHEN REVISITING)
+-----------------------------
+1. Monitor power consumption over time
+2. Check if Niri updates improve GPU selection
+3. Research wlroots GPU selection behavior
+4. Test with different display managers if applicable
+5. Consider community solutions for similar setups
+
+HARDWARE-SPECIFIC VALUES (FOR THIS SYSTEM)
+-------------------------------------------
+⚠️ THESE VALUES ARE HARDWARE-SPECIFIC AND MUST BE DETECTED/CONFIGURED PER SYSTEM:
+
+Hardware Model:
+- AMD Radeon 890M iGPU (integrated)
+- NVIDIA RTX 4050 dGPU (discrete)
+
+Device Paths (HARDWARE-SPECIFIC):
+- /dev/dri/card0: NVIDIA RTX 4050 (renderD128)  ⚠️ May differ on other systems
+- /dev/dri/card1: AMD Radeon 890M iGPU (renderD129)  ⚠️ May differ on other systems
+
+Environment Variable Values (HARDWARE-SPECIFIC):
+- WLR_DRM_DEVICES=/dev/dri/card1  ⚠️ Must detect which card is iGPU
+- GBM_BACKEND=/dev/dri/renderD129  ⚠️ Must detect AMD render node
+- MESA_LOADER_DRIVER_OVERRIDE=radeonsi  ⚠️ AMD-specific, Intel would be "i965" or "iris"
+
+GENERALIZABLE PATTERNS (CAN BE REUSED)
+---------------------------------------
+✓ Pattern: iGPU-first configuration with dGPU offload capability
+✓ Pattern: Environment variable setup for GPU selection
+✓ Pattern: Wrapper scripts for forcing GPU usage (nvidia-offload, amd-only)
+✓ Pattern: System-wide GPU configuration in separate module
+✓ Pattern: Compositor-specific wrapper with environment variables
+✓ Pattern: Power management configuration for NVIDIA drivers
+
+HOW TO GENERALIZE FOR DISTRIBUTION
+-----------------------------------
+For a general distribution, the following needs to be made configurable:
+
+1. GPU Detection:
+   - Auto-detect which /dev/dri/card* is iGPU vs dGPU
+   - Auto-detect render node numbers (renderD*)
+   - Support Intel iGPU (iris/i965) in addition to AMD (radeonsi)
+   - Support different NVIDIA GPU models
+
+2. Configuration Options:
+   - Make GPU device paths configurable (or auto-detected)
+   - Make Mesa driver override configurable based on detected iGPU vendor
+   - Allow user to choose default GPU (iGPU vs dGPU)
+   - Allow user to enable/disable GPU offload wrappers
+
+3. Files to Generalize:
+   - gpu-offload.nix: Make device paths and driver names configurable
+   - niri.nix: Make card numbers and render nodes configurable
+   - Wrapper scripts: Use detected values instead of hardcoded paths
+
+4. Detection Script Needed:
+   - Script to identify iGPU vs dGPU
+   - Script to find correct render node for iGPU
+   - Script to determine Mesa driver name based on iGPU vendor
+
+5. What Can Be Removed for General Distribution:
+   - Hardcoded card numbers (card0, card1)
+   - Hardcoded render node numbers (renderD128, renderD129)
+   - Hardcoded GPU model names (Radeon 890M, RTX 4050)
+   - Hardcoded Mesa driver (radeonsi) - should detect Intel vs AMD
+   - Power consumption values specific to this hardware
+
+6. What Should Stay:
+   - General GPU offload pattern
+   - Environment variable approach
+   - Wrapper script concept
+   - Power management configuration
+   - Module structure (separate files for GPU config)
+
+EXAMPLE GENERALIZED CONFIGURATION
+----------------------------------
+Instead of:
+  WLR_DRM_DEVICES=/dev/dri/card1
+  GBM_BACKEND=/dev/dri/renderD129
+  MESA_LOADER_DRIVER_OVERRIDE=radeonsi
+
+Use:
+  WLR_DRM_DEVICES=${config.hardware.gpu.igpu.device}
+  GBM_BACKEND=${config.hardware.gpu.igpu.renderNode}
+  MESA_LOADER_DRIVER_OVERRIDE=${config.hardware.gpu.igpu.mesaDriver}
+
+Where these values are auto-detected or user-configured.

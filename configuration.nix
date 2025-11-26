@@ -15,6 +15,8 @@ in
       ./asus-dialpad.nix
       #import Niri WM
       ./niri.nix
+      # GPU offloading configuration
+      ./gpu-offload.nix
     ];
 
   # Bootloader.
@@ -27,6 +29,21 @@ in
   #Asus specific firmware controllers
   services.fwupd.enable = true;
   hardware.enableAllFirmware = true;
+  
+  # Power management - works with both GNOME and Niri
+  # This is what GNOME's power save mode uses, so they work together
+  services.power-profiles-daemon.enable = true;
+  
+  # Configure logind for better power management
+  services.logind = {
+    lidSwitch = "suspend";
+    lidSwitchExternalPower = "ignore";
+    extraConfig = ''
+      HandlePowerKey=suspend
+      HandleSuspendKey=suspend
+      HandleHibernateKey=hibernate
+    '';
+  };
 
   #enable flatpak for 3rd party software containers
   services.flatpak.enable = true;
