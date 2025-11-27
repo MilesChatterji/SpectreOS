@@ -167,14 +167,13 @@ in
   rustc
   cargo
   pkg-config
-  unstable.quickshell
   fuzzel
   ];
 
   # Autostart systemd systemctl configs for apps that should open with other apps. 
 
   # Autostart proton-bridge and make it availalbe to all email clients upon opening them.
-  
+
   #Autostart dropbox to make it available in filebrowsers
   systemd.user.services.dropbox = {
     description = "Dropbox";

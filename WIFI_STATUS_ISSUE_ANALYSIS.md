@@ -1,5 +1,18 @@
 # WiFi Status Issue Analysis - Noctalia Shell
 
+**STATUS: ✅ RESOLVED**
+
+The WiFi widget issue was fixed by ensuring `nmcli` is accessible in the Noctalia service PATH. The root cause was that `nmcli` was not found when NetworkService tried to scan for networks, causing the scan to fail silently and leaving `NetworkService.networks` empty.
+
+**Solution Applied**:
+- Added explicit PATH to `noctalia-shell` systemd service environment
+- Included `/run/current-system/sw/bin` and NetworkManager binaries in PATH
+- Added `PassEnvironment = [ "PATH" ];` to ensure PATH is inherited
+
+The widget now correctly shows WiFi status (connected/disconnected).
+
+---
+
 ## How Noctalia Queries WiFi Status
 
 ### NetworkService Implementation

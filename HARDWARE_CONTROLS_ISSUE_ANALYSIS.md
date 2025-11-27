@@ -4,14 +4,14 @@
 
 Certain hardware controls work in GNOME/GDM but not in Niri:
 - ✅ **Volume control** (function keys) - Works in Niri
-- ❌ **Backlit keyboard toggle** - Works in GNOME/GDM, not in Niri
-- ❌ **Brightness control** - Works in GNOME/GDM, not in Niri (software and keyboard function keys)
+- ✅ **Backlit keyboard toggle** - **FIXED** - Now works in Niri (key bindings configured)
+- ✅ **Brightness control** - **FIXED** - Now works in Niri (software widget and keyboard function keys)
   - ✅ GPU issue resolved (AMD iGPU is now active - see GPU_OFFLOAD_NOTES.txt)
-  - ❌ Still needs: brightnessctl in PATH, key bindings, and/or D-Bus service
-- ❌ **Nightlight functionality** - Does not work (needs implementation - wlsunset configuration)
+  - ✅ brightnessctl in PATH, key bindings configured, Noctalia widget working
+- ✅ **Nightlight functionality** - **FIXED** - Now works in Niri (wlsunset service configured)
 - ✅ **ASUS DialPad driver** - **FIXED** - Now works in Niri (see ASUS_DIALPAD_FIX.md)
-- ❌ **WiFi status widget** - Mis-reports as "off" despite active connection (scanning interval issue)
-- ❌ **Screen recording widget** - Does not properly connect to gpu-screen-recorder package
+- ✅ **WiFi status widget** - **FIXED** - Now correctly reports WiFi status (PATH fix for nmcli)
+- ✅ **Screen recording widget** - **FIXED** - Now properly connects to gpu-screen-recorder package (PATH fix)
 
 ## Root Cause Analysis
 
@@ -38,7 +38,7 @@ Certain hardware controls work in GNOME/GDM but not in Niri:
 
 **Current Status**: Service now successfully connects and runs without constant restarts. See `ASUS_DIALPAD_FIX.md` for full details.
 
-### 3. Backlit Keyboard Control
+### 3. Backlit Keyboard Control - ✅ RESOLVED
 
 **Hardware Access**: The keyboard backlight LED is accessible:
 - Path: `/sys/class/leds/asus::kbd_backlight/`
@@ -50,21 +50,24 @@ Certain hardware controls work in GNOME/GDM but not in Niri:
 - Function keys trigger D-Bus calls to Settings Daemon
 - Settings Daemon writes to `/sys/class/leds/asus::kbd_backlight/brightness`
 
-**Why It Doesn't Work in Niri**:
-1. **No D-Bus service**: Niri doesn't have a service to handle function key events
-2. **No key binding**: Niri might not be mapping the function keys to actions
-3. **Permission issue**: The application/widget trying to control it might not have write access
+**Solution Applied**:
+1. ✅ Configured Niri key bindings for keyboard backlight control
+2. ✅ Added `brightnessctl` key bindings: `XF86KbdBrightnessUp`, `XF86KbdBrightnessDown`
+3. ✅ Added toggle key binding: `Mod+Shift+B` to toggle between off (0) and max (3)
+4. ✅ `brightnessctl` available system-wide and accessible via key bindings
 
-**Direct Control Test**:
-```bash
-# This should work if run as root or with proper permissions
-echo 0 > /sys/class/leds/asus::kbd_backlight/brightness  # Off
-echo 1 > /sys/class/leds/asus::kbd_backlight/brightness  # Low
-echo 2 > /sys/class/leds/asus::kbd_backlight/brightness  # Medium
-echo 3 > /sys/class/leds/asus::kbd_backlight/brightness  # High
-```
+**Current State**:
+- ✅ Keyboard backlight control working via function keys
+- ✅ Toggle key binding working (`Mod+Shift+B`)
+- ✅ `brightnessctl` configured to control `asus::kbd_backlight` device
+- ✅ Key bindings configured in `~/.config/niri/config.kdl`
 
-### 4. Brightness Control - ❌ STILL NOT WORKING
+**Key Bindings Configured**:
+- `XF86KbdBrightnessUp`: Increase keyboard backlight
+- `XF86KbdBrightnessDown`: Decrease keyboard backlight
+- `Mod+Shift+B`: Toggle keyboard backlight (off ↔ max)
+
+### 4. Brightness Control - ✅ RESOLVED
 
 **Hardware Access**: Display backlight is accessible:
 - Path: `/sys/class/backlight/amdgpu_bl1/`
@@ -72,26 +75,20 @@ echo 3 > /sys/class/leds/asus::kbd_backlight/brightness  # High
 
 **Status Update**: 
 - ✅ GPU switching issue has been resolved (AMD iGPU is now active - see GPU_OFFLOAD_NOTES.txt)
-- ❌ **Brightness controls still not working** (both software and keyboard function keys)
+- ✅ **Brightness controls now working** (both software widget and keyboard function keys)
 
-**Why It's Still Not Working**:
-1. **No brightnessctl in PATH**: `brightnessctl` is only in `noctalia-shell` runtime dependencies, not system-wide
-2. **No D-Bus service**: No service to handle brightness function keys
-3. **No key bindings**: Niri may not have key bindings configured for brightness function keys
-4. **Widget integration**: Noctalia widgets may not be properly configured to control brightness
+**Solution Applied**:
+1. ✅ Added `brightnessctl` to `environment.systemPackages` in `niri.nix` for system-wide availability
+2. ✅ Configured Niri key bindings for brightness function keys (XF86MonBrightnessUp/Down) in `~/.config/niri/config.kdl`
+3. ✅ Fixed Noctalia brightness widget by ensuring `sh` and `brightnessctl` are in PATH via systemd service environment
+4. ✅ Added explicit PATH to `noctalia-shell` systemd service to include `/run/current-system/sw/bin` and necessary binaries
 
 **Current State**:
 - ✅ GPU issue resolved - AMD is now the active GPU (backlight hardware is accessible)
-- ❌ Brightness control via software (brightnessctl) - not working
-- ❌ Brightness control via keyboard function keys - not working
-- `brightnessctl` is listed in `noctalia-shell` runtimeDeps but not system-wide
-- No service or key bindings to handle brightness function keys
-
-**Next Steps** (to be addressed later):
-1. Add `brightnessctl` to `environment.systemPackages` for system-wide availability
-2. Configure Niri key bindings for brightness function keys (XF86MonBrightnessUp/Down)
-3. Test Noctalia brightness widgets to see if they work with brightnessctl
-4. Consider creating a D-Bus service or systemd user service for brightness control
+- ✅ Brightness control via software widget - working (Noctalia widget shows correct percentage)
+- ✅ Brightness control via keyboard function keys - working (XF86MonBrightnessUp/Down key bindings)
+- ✅ `brightnessctl` available system-wide and in Noctalia service PATH
+- ✅ Key bindings configured in Niri config for brightness function keys
 
 ### 5. Volume Control (Why It Works)
 
@@ -101,91 +98,88 @@ echo 3 > /sys/class/leds/asus::kbd_backlight/brightness  # High
 - Function keys can directly control PipeWire via D-Bus
 - Niri or the application can handle these keys
 
-### 6. WiFi Status Widget Mis-reporting
+### 6. WiFi Status Widget Mis-reporting - ✅ RESOLVED
 
 **Problem**: The WiFi widget in Noctalia Shell shows as "off" even though WiFi is connected and working.
 
-**Root Cause**: Scanning interval and timing issues in Noctalia's NetworkService:
-- The widget icon depends on `NetworkService.networks` being populated with a connected network
-- The scan happens asynchronously after component initialization
-- If the scan doesn't complete or is delayed, `NetworkService.networks` remains empty
-- The widget shows "wifi-off" when `networks` is empty, even if WiFi is actually connected
-- The widget does NOT check `Settings.data.network.wifiEnabled` for icon display
+**Root Cause**: `nmcli` was not found in PATH when Noctalia's NetworkService tried to scan for networks, causing the scan to fail silently.
+
+**Solution Applied**:
+1. ✅ Added explicit PATH to `noctalia-shell` systemd service environment
+2. ✅ Included `/run/current-system/sw/bin` and NetworkManager binaries in PATH
+3. ✅ Added `PassEnvironment = [ "PATH" ];` to ensure PATH is inherited
 
 **Current State**:
 - ✅ WiFi adapter is enabled (`nmcli radio wifi` returns "enabled")
 - ✅ WiFi is connected (active connection exists)
 - ✅ `nmcli` scan command works correctly and shows connected network
-- ❌ Widget shows "wifi-off" because `NetworkService.networks` is empty or scan hasn't completed
+- ✅ Widget now correctly shows WiFi status (connected/disconnected)
+- ✅ `nmcli` is accessible in Noctalia service PATH
 
-**Why It Happens**:
-1. **Initial State**: On startup, `NetworkService.networks` starts as empty `{}`
-2. **Scan Timing**: The scan happens asynchronously after component initialization
-3. **Scan Failure/Delay**: If the scan fails or doesn't complete in time, `networks` remains empty
-4. **Widget Logic**: Widget only checks `NetworkService.networks` for connected status, not `Settings.data.network.wifiEnabled`
+**Why It Was Failing**:
+1. **PATH Issue**: `nmcli` was not in the PATH when Noctalia's NetworkService tried to execute it
+2. **Service Environment**: The systemd user service didn't have the system PATH configured
+3. **Scan Failure**: Without `nmcli`, the network scan failed, leaving `NetworkService.networks` empty
+4. **Widget Display**: Empty networks caused widget to show "wifi-off" even when WiFi was connected
 
-**Solution Options**:
-1. Fix widget logic to check `Settings.data.network.wifiEnabled` as fallback
-2. Ensure scan completes reliably before widget renders
-3. Improve state detection to combine `wifiEnabled` AND network connection status
-4. Check if `nmcli` output format matches expected parsing
+**Fix Details**:
+- Added `PATH=/run/current-system/sw/bin:${pkgs.lib.makeBinPath [ ... pkgs.networkmanager ]}` to service environment
+- This ensures `nmcli`, `sh`, `brightnessctl`, and other system binaries are accessible to Noctalia
 
-See `WIFI_STATUS_ISSUE_ANALYSIS.md` for detailed analysis.
-
-### 7. Nightlight Functionality - ❌ STILL NOT WORKING
+### 7. Nightlight Functionality - ✅ RESOLVED
 
 **Problem**: Nightlight (blue light filter) functionality does not work in Niri.
 
 **Root Cause**: 
-- Nightlight typically requires access to display color temperature controls
-- May require specific GPU driver support or D-Bus services
+- Nightlight requires `wlsunset` to be running as a service
 - GNOME provides nightlight via Settings Daemon, which Niri doesn't have
-- Note: GPU issue is resolved (AMD is now active), but nightlight still needs implementation
+- `wlsunset` was available but not configured/started
+
+**Solution Applied**:
+1. ✅ Added `wlsunset` to `environment.systemPackages` in `niri.nix` for system-wide availability
+2. ✅ Configured `wlsunset` as a systemd user service in `niri.nix`
+3. ✅ Added key binding in Niri config (`Mod+Shift+N`) to toggle nightlight on/off
+4. ✅ Service starts automatically with the user session
 
 **Current State**:
-- ❌ Nightlight not functional in Niri
-- ❌ No equivalent service to GNOME's nightlight implementation
+- ✅ Nightlight functional in Niri via `wlsunset` service
+- ✅ Service configured and starts automatically
 - ✅ GPU issue resolved (AMD is now active GPU - see GPU_OFFLOAD_NOTES.txt)
-- `wlsunset` is available in noctalia-shell runtimeDeps but not configured/started
+- ✅ Key binding configured for easy toggle (`Mod+Shift+N`)
+- ✅ `wlsunset` available system-wide
 
-**Next Steps** (to be addressed later):
-1. Configure `wlsunset` as a systemd user service for automatic nightlight
-2. Integrate nightlight control into Noctalia widgets
-3. Add key bindings or widget controls to toggle nightlight on/off
-4. Check if display hardware supports color temperature adjustment
+**Service Configuration**:
+- Service name: `wlsunset.service` (systemd user service)
+- Starts with: `graphical-session.target`
+- Key binding: `Mod+Shift+N` toggles service on/off
+- Can be controlled via: `systemctl --user start/stop wlsunset.service`
 
-**Potential Solutions**:
-1. Use `wlsunset` (already in noctalia-shell runtimeDeps) - provides Wayland nightlight
-2. Configure `wlsunset` as a systemd user service
-3. Integrate nightlight control into Noctalia widgets
-4. Check if display hardware supports color temperature adjustment
-
-**Note**: `wlsunset` is already available in noctalia-shell dependencies but may need to be configured/started.
-
-### 8. Screen Recording Widget Not Connecting to gpu-screen-recorder
+### 8. Screen Recording Widget Not Connecting to gpu-screen-recorder - ✅ RESOLVED
 
 **Problem**: The screen recording bar widget in Noctalia does not properly connect to the `gpu-screen-recorder` package.
 
 **Root Cause**: 
-- Widget may be looking for `gpu-screen-recorder` in a different location
-- Widget may not have proper permissions or environment variables
-- Widget may need specific configuration to connect to the package
-- Path or command name mismatch between widget expectations and actual package
+- `gpu-screen-recorder` was not in PATH when Noctalia's widget tried to execute it
+- Widget could not find the `gpu-screen-recorder` command, causing widget and control center interactions to fail
+
+**Solution Applied**:
+1. ✅ Added explicit PATH to `noctalia-shell` systemd service environment
+2. ✅ Included `/run/current-system/sw/bin` in PATH where `gpu-screen-recorder` is located
+3. ✅ Added `PassEnvironment = [ "PATH" ];` to ensure PATH is inherited
 
 **Current State**:
-- ✅ `gpu-screen-recorder` is installed system-wide (see GPU_SCREEN_RECORDER_FIX.md)
+- ✅ `gpu-screen-recorder` is installed system-wide
 - ✅ `gpu-screen-recorder` is available in PATH
 - ✅ `gpu-screen-recorder` works when run directly from command line
-- ❌ Widget does not properly connect/control the package
+- ✅ Widget now properly connects/controls the package
+- ✅ Control center interactions working correctly
 
-**Potential Solutions**:
-1. Check widget source code to see how it's trying to call gpu-screen-recorder
-2. Verify widget has access to PATH where gpu-screen-recorder is located
-3. Check if widget needs specific environment variables or permissions
-4. Ensure widget can execute the gpu-screen-recorder command
-5. May need to configure widget with explicit path to gpu-screen-recorder
+**Why It Was Failing**:
+- The widget tried to execute `gpu-screen-recorder` but couldn't find it in the service's PATH
+- Without access to the system PATH, the widget couldn't locate the binary
+- The PATH fix applied to resolve brightness/WiFi issues also fixed screen recording
 
-**Note**: This is a widget integration issue, not a package installation issue. The package itself works correctly.
+**Note**: This was a PATH configuration issue, not a package installation or widget integration issue. The package and widget were both correct, they just needed proper PATH access.
 
 ## Key Differences: GNOME vs Niri
 
@@ -300,12 +294,12 @@ nmcli -t -f NAME,TYPE,DEVICE connection show --active | grep wifi
 
 **Main Issues**:
 1. ✅ **ASUS DialPad**: **FIXED** - Now dynamically detects Wayland display
-2. ❌ **Backlit Keyboard**: No service to handle function keys → no D-Bus interface → no control
+2. ✅ **Backlit Keyboard**: **FIXED** - Key bindings configured in Niri config (XF86KbdBrightnessUp/Down, Mod+Shift+B)
 3. ✅ **GPU Issue**: **RESOLVED** - AMD iGPU is now active (see GPU_OFFLOAD_NOTES.txt)
-4. ❌ **Brightness Control**: **STILL NOT WORKING** - Both software and keyboard function keys (needs brightnessctl in PATH and key bindings/service)
-5. ❌ **Nightlight**: **STILL NOT WORKING** - Needs implementation (wlsunset configuration)
-6. ❌ **WiFi Status Widget**: Mis-reports as "off" due to scanning interval/timing issues in Noctalia
-7. ❌ **Screen Recording Widget**: Does not properly connect to gpu-screen-recorder package
+4. ✅ **Brightness Control**: **FIXED** - Both software widget and keyboard function keys working
+5. ✅ **Nightlight**: **FIXED** - wlsunset service configured and working (toggle with Mod+Shift+N)
+6. ✅ **WiFi Status Widget**: **FIXED** - Now correctly reports WiFi status (PATH fix for nmcli)
+7. ✅ **Screen Recording Widget**: **FIXED** - Now properly connects to gpu-screen-recorder package (PATH fix)
 8. ✅ **Volume**: Works because PipeWire is session-independent
 
 **Why GNOME Works**:
@@ -313,25 +307,27 @@ nmcli -t -f NAME,TYPE,DEVICE connection show --active | grep wifi
 - Function keys are automatically mapped to D-Bus calls
 - Services are started automatically with the session
 
-**Why Niri Doesn't Work**:
-- No equivalent to GNOME Settings Daemon
-- Function keys not automatically mapped
-- Services need explicit configuration
-- Some tools (like `brightnessctl`) not in system PATH
+**How Niri Now Works**:
+- ✅ Explicit key bindings configured in Niri config for hardware controls
+- ✅ Systemd user services configured for background functionality (wlsunset)
+- ✅ System tools (brightnessctl, nmcli) available in PATH via service environment
+- ✅ Noctalia widgets can access system binaries via proper PATH configuration
 
-**Next Steps** (Priority Order):
+**Completed Tasks**:
 1. ✅ ~~Fix ASUS DialPad Wayland display detection~~ - **COMPLETED**
 2. ✅ ~~Resolve GPU switching issue (AMD now active)~~ - **COMPLETED** (see GPU_OFFLOAD_NOTES.txt)
-3. ❌ **TODO**: Fix brightness control (software and keyboard function keys)
-   - Add `brightnessctl` to system packages
-   - Configure Niri key bindings for brightness function keys
-   - Test Noctalia brightness widgets
-4. ❌ **TODO**: Configure nightlight functionality (wlsunset or alternative)
-   - Set up wlsunset as systemd user service
-   - Add controls/widgets for nightlight toggle
-5. ❌ **TODO**: Fix WiFi widget logic in Noctalia to handle scanning intervals properly (see WIFI_STATUS_ISSUE_ANALYSIS.md)
-6. ❌ **TODO**: Fix screen recording widget connection to gpu-screen-recorder
-7. ❌ **TODO**: Fix backlit keyboard control (function keys)
-   - Configure Niri key bindings OR
-   - Create a hardware control service to handle function keys
+3. ✅ ~~Fix brightness control (software and keyboard function keys)~~ - **COMPLETED**
+   - ✅ Added `brightnessctl` to system packages
+   - ✅ Configured Niri key bindings for brightness function keys
+   - ✅ Fixed Noctalia brightness widgets (PATH configuration)
+4. ✅ ~~Configure nightlight functionality (wlsunset)~~ - **COMPLETED**
+   - ✅ Set up wlsunset as systemd user service
+   - ✅ Added key binding for nightlight toggle
+5. ✅ ~~Fix WiFi widget logic in Noctalia~~ - **COMPLETED** (PATH fix for nmcli)
+6. ✅ ~~Fix backlit keyboard control (function keys)~~ - **COMPLETED** (key bindings configured)
+
+**Remaining Tasks**:
+1. ✅ ~~Fix screen recording widget connection to gpu-screen-recorder~~ - **COMPLETED** (PATH fix resolved the issue)
+
+**All Major Hardware Control Issues Resolved!** 🎉
 
