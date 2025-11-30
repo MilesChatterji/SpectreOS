@@ -316,3 +316,5 @@ cat /sys/class/drm/card*/device/vendor
 **Next Review**: Before NixOS 25.11 upgrade
 
 
+
+

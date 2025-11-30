@@ -186,3 +186,5 @@ Display Size in Widget: ~32-48px (80% of bar height)
 
 
 
+
+
