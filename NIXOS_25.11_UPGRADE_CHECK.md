@@ -1,16 +1,43 @@
 # NixOS 25.11 (Xantusia) Pre-Upgrade Compatibility Check
-## Review Date: $(date +%Y-%m-%d)
-## Current Version: 25.05 → Target: 25.11
+## Review Date: 2024-12-01
+## Status: ✅ **UPGRADE COMPLETED** - See `NIXOS_25.11_UPGRADE_COMPLETED.md` for details
 
-This document analyzes the NixOS 25.11 release notes against your current configuration to identify potential breakage issues before upgrading.
+This document analyzed the NixOS 25.11 release notes against your current configuration to identify potential breakage issues before upgrading.
 
-### Current System State
+### Upgrade Status
+- **Upgrade Date**: 2024-12-01
+- **Status**: ✅ **COMPLETED SUCCESSFULLY**
+- **Current Version**: 25.11 (Xantusia)
+- **Kernel**: 6.17.9 (using `linuxPackages_latest`)
+- **Channels Configured**:
+  - `nixos https://nixos.org/channels/nixos-25.11`
+  - `unstable https://nixos.org/channels/nixpkgs-unstable`
+
+**📋 For complete upgrade details, see**: `NIXOS_25.11_UPGRADE_COMPLETED.md`
+
+---
+
+## ⚠️ **ACTUAL BREAKING CHANGES ENCOUNTERED** (Not in release notes)
+
+The following breaking changes were **NOT** mentioned in the release notes but caused upgrade failures:
+
+1. **services.logind.extraConfig → services.logind.settings.Login** (String → Attribute Set)
+2. **services.xserver.displayManager.gdm → services.displayManager.gdm**
+3. **services.xserver.desktopManager.gnome → services.desktopManager.gnome**
+4. **Python package: systemd → systemd-python** (Package renamed)
+5. **users.groups GID enforcement** (System GIDs required for udev)
+
+**Note**: These option renamings make upgrades difficult for non-technical users. Consider documenting these changes more prominently in release notes.
+
+---
+
+### Previous System State (Pre-Upgrade)
 - **NixOS Version**: 25.05
 - **Kernel**: 6.17.8 (using `linuxPackages_latest`)
 - **Channels Configured**:
   - `nixos https://nixos.org/channels/nixos-25.05`
   - `unstable https://nixos.org/channels/nixpkgs-unstable`
-- **Note**: You're already on a newer kernel (6.17.8) than the NixOS 25.11 default (6.12), which reduces upgrade risk.
+- **Note**: Already on a newer kernel (6.17.8) than the NixOS 25.11 default (6.12), which reduced upgrade risk.
 
 ---
 

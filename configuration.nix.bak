@@ -35,17 +35,14 @@ in
   services.power-profiles-daemon.enable = true;
   
   # Configure logind for better power management
-  # NixOS 25.11: All logind options moved to settings.Login
   services.logind = {
-    settings = {
-      Login = {
-        HandlePowerKey = "suspend";
-        HandleSuspendKey = "suspend";
-        HandleHibernateKey = "hibernate";
-        HandleLidSwitch = "suspend";
-        HandleLidSwitchExternalPower = "ignore";
-      };
-    };
+    lidSwitch = "suspend";
+    lidSwitchExternalPower = "ignore";
+    extraConfig = ''
+      HandlePowerKey=suspend
+      HandleSuspendKey=suspend
+      HandleHibernateKey=hibernate
+    '';
   };
 
   #enable flatpak for 3rd party software containers
@@ -83,9 +80,8 @@ in
   services.xserver.enable = true;
 
   # Enable the GNOME Desktop Environment.
-  # NixOS 25.11: Options moved out of services.xserver
-  services.displayManager.gdm.enable = true;
-  services.desktopManager.gnome.enable = true;
+  services.xserver.displayManager.gdm.enable = true;
+  services.xserver.desktopManager.gnome.enable = true;
 
   # Configure keymap in X11
   services.xserver.xkb = {
@@ -172,12 +168,13 @@ in
   cargo
   pkg-config
   fuzzel
+  discord
   ];
 
   # Autostart systemd systemctl configs for apps that should open with other apps. 
 
   # Autostart proton-bridge and make it availalbe to all email clients upon opening them.
-
+  
   #Autostart dropbox to make it available in filebrowsers
   systemd.user.services.dropbox = {
     description = "Dropbox";
@@ -225,6 +222,6 @@ in
   # this value at the release version of the first install of this system.
   # Before changing this value read the documentation for this option
   # (e.g. man configuration.nix or on https://nixos.org/nixos/options.html).
-  system.stateVersion = "25.11"; # Did you read the comment?
+  system.stateVersion = "25.05"; # Did you read the comment?
 
 }

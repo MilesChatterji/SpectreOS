@@ -46,37 +46,10 @@ let
     #!${pkgs.bash}/bin/bash
     # Auto brightness based on ambient light sensor
     
-    # Dynamically discover sensor path (device number may change after kernel/system upgrades)
-    # Look for the HID-SENSOR-200041 ambient light sensor
-    RAW_FILE=""
-    SCALE_FILE=""
-    
-    # Find the sensor by searching for in_illuminance_raw files under HID-SENSOR-200041
-    for raw_path in $(find /sys/devices -path "*HID-SENSOR-200041*" -name "in_illuminance_raw" 2>/dev/null); do
-      if [ -r "''$raw_path" ]; then
-        RAW_FILE="''$raw_path"
-        # Find corresponding scale file in the same directory
-        SENSOR_DIR=$(dirname "''$raw_path")
-        if [ -r "''$SENSOR_DIR/in_illuminance_scale" ]; then
-          SCALE_FILE="''$SENSOR_DIR/in_illuminance_scale"
-          break
-        fi
-      fi
-    done
-    
-    # Fallback: if not found, try finding any illuminance sensor
-    if [ -z "''$RAW_FILE" ]; then
-      RAW_FILE=$(find /sys/devices -name "in_illuminance_raw" 2>/dev/null | head -1)
-      if [ -n "''$RAW_FILE" ]; then
-        SENSOR_DIR=$(dirname "''$RAW_FILE")
-        SCALE_FILE="''$SENSOR_DIR/in_illuminance_scale"
-      fi
-    fi
-    
-    # Exit if sensor not found
-    if [ -z "''$RAW_FILE" ] || [ ! -r "''$RAW_FILE" ]; then
-      exit 0  # Silently exit if sensor not available
-    fi
+    # Sensor path (HID-SENSOR-200041.6.auto/iio:device2)
+    SENSOR_BASE="/sys/devices/0020:1022:0001.0009/HID-SENSOR-200041.6.auto/iio:device2"
+    RAW_FILE="''$SENSOR_BASE/in_illuminance_raw"
+    SCALE_FILE="''$SENSOR_BASE/in_illuminance_scale"
     
     # Manual override protection
     MANUAL_BRIGHTNESS_FILE="''$HOME/.cache/manual-brightness-time"
@@ -169,7 +142,7 @@ let
       timeout 180 '${brightness-save-restore}/bin/brightness-save-restore save && touch /tmp/auto-brightness-disabled && ${pkgs.brightnessctl}/bin/brightnessctl --class=backlight set 10% && KBD_BRIGHTNESS=$(${pkgs.brightnessctl}/bin/brightnessctl --class=leds --device=asus::kbd_backlight get 2>/dev/null || echo "0") && echo "$KBD_BRIGHTNESS" > "$HOME/.cache/niri-kbd-brightness-backup" && ${pkgs.brightnessctl}/bin/brightnessctl --class=leds --device=asus::kbd_backlight set 0' \
         resume '${brightness-save-restore}/bin/brightness-save-restore restore && rm -f /tmp/auto-brightness-disabled && if [ -f "$HOME/.cache/niri-kbd-brightness-backup" ]; then KBD_BRIGHTNESS=$(cat "$HOME/.cache/niri-kbd-brightness-backup"); ${pkgs.brightnessctl}/bin/brightnessctl --class=leds --device=asus::kbd_backlight set "$KBD_BRIGHTNESS" 2>/dev/null || true; rm -f "$HOME/.cache/niri-kbd-brightness-backup"; fi' \
       timeout 300 '${unstable.quickshell}/bin/qs -p ${noctalia-shell}/share/noctalia-shell ipc call lockScreen lock' \
-      timeout 900 '${brightness-save-restore}/bin/brightness-save-restore save && systemctl --user suspend' \
+      timeout 900 '${brightness-save-restore}/bin/brightness-save-restore save && ${pkgs.systemd}/bin/systemctl --user suspend' \
         before-sleep '${unstable.quickshell}/bin/qs -p ${noctalia-shell}/share/noctalia-shell ipc call lockScreen lock'
   '';
   
@@ -331,7 +304,7 @@ let
       owner = "noctalia-dev";
       repo = "noctalia-shell";
       rev = "main";
-      sha256 = "sha256-+pA0uczwv4mrJqAZNzJmdKtfCKPComNfQ7HDc/2+RVU=";  # Updated for NixOS 25.11
+      sha256 = "sha256-pWz6IWgG614EoVxPY6tlEsurZMznBvbyliI3go1BAuY=";
     };
     
     nativeBuildInputs = with pkgs; [
@@ -340,7 +313,6 @@ let
     
     buildInputs = with pkgs; [
       qt6.qtbase
-      qt6.qtmultimedia  # Required for SoundService.qml (QtMultimedia module)
     ];
     
     # Runtime dependencies (from official package.nix)

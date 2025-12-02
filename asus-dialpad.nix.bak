@@ -5,7 +5,6 @@
 
 let
   # Python environment with all dependencies
-  # NixOS 25.11: systemd package renamed to systemd-python
   pythonEnv = pkgs.python3.withPackages (ps: with ps; [
     numpy
     libevdev
@@ -15,7 +14,7 @@ let
     pyasyncore
     pywayland
     xkbcommon
-    systemd-python  # Renamed from systemd in NixOS 25.11
+    systemd
   ]);
 
   # ASUS DialPad Driver package
@@ -83,13 +82,10 @@ in
   '';
 
   # Groups for ASUS DialPad
-  # Note: GIDs are set to standard system group IDs to ensure udev recognizes them
-  # input group already has GID 174 (system range) in NixOS defaults, so we keep it
-  # i2c and uinput need system GIDs (61 and 98) to be recognized by udev
   users.groups = {
-    uinput = { gid = 98; };
-    # input group uses default GID 174 (already a system group)
-    i2c = { gid = 61; };
+    uinput = { };
+    input = { };
+    i2c = { };
   };
 
   # Note: User groups (uinput, input, i2c) are now defined in configuration.nix
