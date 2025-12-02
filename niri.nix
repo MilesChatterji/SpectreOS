@@ -90,30 +90,21 @@ let
       exit 0  # Skip adjustment when power saving has dimmed screen
     fi
     
-    # Get current brightness to detect manual changes
+    # Get current brightness
     CURRENT_RAW=$(${pkgs.brightnessctl}/bin/brightnessctl --class=backlight get 2>/dev/null || echo "0")
     CURRENT_MAX=$(${pkgs.brightnessctl}/bin/brightnessctl --class=backlight max 2>/dev/null || echo "100")
     CURRENT_PERCENT=$((CURRENT_RAW * 100 / CURRENT_MAX))
     
-    # Detect manual brightness changes by comparing current brightness to what we last set
-    # If brightness differs significantly from our last setting, assume it was manually changed
-    if [ -f "''$LAST_AUTO_BRIGHTNESS_FILE" ]; then
-      LAST_AUTO_BRIGHTNESS=$(cat "''$LAST_AUTO_BRIGHTNESS_FILE" 2>/dev/null || echo "0")
-      BRIGHTNESS_DIFF=$((CURRENT_PERCENT - LAST_AUTO_BRIGHTNESS))
-      # If difference is more than 5% (hysteresis threshold), it's likely a manual change
-      if [ ''${BRIGHTNESS_DIFF#-} -gt 5 ]; then
-        # Mark as manual change
-        touch "''$MANUAL_BRIGHTNESS_FILE" 2>/dev/null || true
-      fi
-    fi
-    
-    # Check if user manually changed brightness recently
+    # Check if user manually changed brightness recently (check cooldown FIRST)
+    # Manual overrides are only set by brightnessctl-manual script, not auto-detected
     if [ -f "''$MANUAL_BRIGHTNESS_FILE" ]; then
       MANUAL_TIME=$(stat -c %Y "''$MANUAL_BRIGHTNESS_FILE" 2>/dev/null || echo "0")
       NOW=$(date +%s)
       if [ $((NOW - MANUAL_TIME)) -lt ''$COOLDOWN ]; then
         exit 0  # Skip auto adjustment during cooldown
       fi
+      # Cooldown expired, remove the manual override file
+      rm -f "''$MANUAL_BRIGHTNESS_FILE" 2>/dev/null || true
     fi
     
     # Read sensor values
@@ -196,7 +187,7 @@ let
       timeout 180 '${brightness-save-restore}/bin/brightness-save-restore save && touch /tmp/auto-brightness-disabled && ${pkgs.brightnessctl}/bin/brightnessctl --class=backlight set 10% && KBD_BRIGHTNESS=$(${pkgs.brightnessctl}/bin/brightnessctl --class=leds --device=asus::kbd_backlight get 2>/dev/null || echo "0") && echo "$KBD_BRIGHTNESS" > "$HOME/.cache/niri-kbd-brightness-backup" && ${pkgs.brightnessctl}/bin/brightnessctl --class=leds --device=asus::kbd_backlight set 0' \
         resume '${brightness-save-restore}/bin/brightness-save-restore restore && rm -f /tmp/auto-brightness-disabled && if [ -f "$HOME/.cache/niri-kbd-brightness-backup" ]; then KBD_BRIGHTNESS=$(cat "$HOME/.cache/niri-kbd-brightness-backup"); ${pkgs.brightnessctl}/bin/brightnessctl --class=leds --device=asus::kbd_backlight set "$KBD_BRIGHTNESS" 2>/dev/null || true; rm -f "$HOME/.cache/niri-kbd-brightness-backup"; fi' \
       timeout 300 '${unstable.quickshell}/bin/qs -p ${noctalia-shell}/share/noctalia-shell ipc call lockScreen lock' \
-      timeout 900 '${brightness-save-restore}/bin/brightness-save-restore save && loginctl suspend' \
+      timeout 900 '${brightness-save-restore}/bin/brightness-save-restore save && ${pkgs.systemd}/bin/systemctl suspend' \
         before-sleep '${unstable.quickshell}/bin/qs -p ${noctalia-shell}/share/noctalia-shell ipc call lockScreen lock'
   '';
   
@@ -591,7 +582,7 @@ in
       # timeout 900: After 15 minutes of inactivity, suspend system
       #   - Before suspend, save brightness (in case dimmed)
       #   - Lock screen before suspend (using Noctalia Shell's lock screen)
-      #   - Suspend using loginctl (user-level suspend command)
+      #   - Suspend using systemctl suspend (system-level suspend command, requires polkit permissions)
       ExecStart = "${swayidle-start}";
       Restart = "on-failure";
       RestartSec = 5;

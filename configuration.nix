@@ -139,63 +139,24 @@ in
 
   # List packages installed in system profile. To search, run:
   # $ nix search wget
+  # Most user packages have been migrated to Home Manager
+  # Keep these at system level for TTY/recovery access and multi-user availability
   environment.systemPackages = with pkgs; [
   #  vim # Do not forget to add an editor to edit configuration.nix! The Nano editor is also installed by default.
-  neovim
-  git
-  wget
-  ghostty
-  fastfetch
-  neofetch
-  unstable.code-cursor
-  gh
-  unstable.spotify
-  dropbox-cli
-  zoom-us
-  thunderbird
-  unstable.davinci-resolve-studio
-  unstable.darktable
-  cmatrix
-  btop
-  cava
-  fwupd
-  busybox
-  gimp3
-  yazi
-  fzf
-  unstable.omnissa-horizon-client
-  signal-desktop
-  signal-cli
-  wofi
-  lshw
-  rustc
-  cargo
-  pkg-config
-  fuzzel
+  neovim  # Keep for TTY/recovery editing
+  git     # Keep for version control in TTY/recovery
+  wget    # Keep for downloads in TTY/recovery
+  fwupd   # System firmware updates
+  busybox # System utilities
+  lshw    # Hardware info (system-level)
   ];
 
   # Autostart systemd systemctl configs for apps that should open with other apps. 
 
   # Autostart proton-bridge and make it availalbe to all email clients upon opening them.
 
-  #Autostart dropbox to make it available in filebrowsers
-  systemd.user.services.dropbox = {
-    description = "Dropbox";
-    wantedBy = [ "graphical-session.target" ];
-    environment = {
-      QT_PLUGIN_PATH = "/run/current-system/sw/" + pkgs.qt5.qtbase.qtPluginPrefix;
-      QML2_IMPORT_PATH = "/run/current-system/sw/" + pkgs.qt5.qtbase.qtQmlPrefix;
-    };
-    serviceConfig = {
-      ExecStart = "${pkgs.dropbox}/bin/dropbox";
-      ExecReload = "${pkgs.coreutils}/bin/kill -HUP $MAINPID";
-      KillMode = "control-group"; # upstream recommends process
-      Restart = "on-failure";
-      PrivateTmp = true;
-      ProtectSystem = "full";
-      Nice = 10;
-    };
-  };
+  # Dropbox service has been migrated to Home Manager
+  # See ~/.config/home-manager/home.nix for systemd.user.services.dropbox
 
   # Some programs need SUID wrappers, can be configured further or are
   # started in user sessions.
