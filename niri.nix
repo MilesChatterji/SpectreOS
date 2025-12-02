@@ -38,9 +38,10 @@ let
   '';
   
   # Auto brightness script based on ambient light sensor
-  # Reads sensor from /sys/devices/.../iio:device2/in_illuminance_raw
+  # Reads sensor from /sys/devices/.../iio:device*/in_illuminance_raw (dynamically discovered)
   # Maps lux values to brightness percentages with hysteresis to prevent flickering
-  # Includes manual override protection (30-second cooldown after manual changes)
+  # Includes automatic manual override detection (30-second cooldown after manual changes)
+  # Automatically detects manual brightness changes from keyboard shortcuts, Noctalia widget, or direct brightnessctl commands
   # Pauses when power saving dims the screen
   auto-brightness-sensor = pkgs.writeScriptBin "auto-brightness-sensor" ''
     #!${pkgs.bash}/bin/bash
@@ -80,12 +81,30 @@ let
     
     # Manual override protection
     MANUAL_BRIGHTNESS_FILE="''$HOME/.cache/manual-brightness-time"
+    LAST_AUTO_BRIGHTNESS_FILE="''$HOME/.cache/last-auto-brightness"
     COOLDOWN=30  # seconds
     
     # Power saving integration - pause if screen is dimmed
     AUTO_BRIGHTNESS_DISABLED_FILE="/tmp/auto-brightness-disabled"
     if [ -f "''$AUTO_BRIGHTNESS_DISABLED_FILE" ]; then
       exit 0  # Skip adjustment when power saving has dimmed screen
+    fi
+    
+    # Get current brightness to detect manual changes
+    CURRENT_RAW=$(${pkgs.brightnessctl}/bin/brightnessctl --class=backlight get 2>/dev/null || echo "0")
+    CURRENT_MAX=$(${pkgs.brightnessctl}/bin/brightnessctl --class=backlight max 2>/dev/null || echo "100")
+    CURRENT_PERCENT=$((CURRENT_RAW * 100 / CURRENT_MAX))
+    
+    # Detect manual brightness changes by comparing current brightness to what we last set
+    # If brightness differs significantly from our last setting, assume it was manually changed
+    if [ -f "''$LAST_AUTO_BRIGHTNESS_FILE" ]; then
+      LAST_AUTO_BRIGHTNESS=$(cat "''$LAST_AUTO_BRIGHTNESS_FILE" 2>/dev/null || echo "0")
+      BRIGHTNESS_DIFF=$((CURRENT_PERCENT - LAST_AUTO_BRIGHTNESS))
+      # If difference is more than 5% (hysteresis threshold), it's likely a manual change
+      if [ ''${BRIGHTNESS_DIFF#-} -gt 5 ]; then
+        # Mark as manual change
+        touch "''$MANUAL_BRIGHTNESS_FILE" 2>/dev/null || true
+      fi
     fi
     
     # Check if user manually changed brightness recently
@@ -126,11 +145,6 @@ let
       TARGET_KBD_BRIGHTNESS=0  # Keyboard off in very bright conditions
     fi
     
-    # Get current brightness to implement hysteresis (only adjust if change > 5%)
-    CURRENT_RAW=$(${pkgs.brightnessctl}/bin/brightnessctl --class=backlight get 2>/dev/null || echo "0")
-    CURRENT_MAX=$(${pkgs.brightnessctl}/bin/brightnessctl --class=backlight max 2>/dev/null || echo "100")
-    CURRENT_PERCENT=$((CURRENT_RAW * 100 / CURRENT_MAX))
-    
     # Only adjust if change is significant (hysteresis: 5% threshold)
     DIFF=$((TARGET_BRIGHTNESS - CURRENT_PERCENT))
     if [ ''${DIFF#-} -lt 5 ]; then
@@ -140,6 +154,9 @@ let
     # Set screen brightness
     ${pkgs.brightnessctl}/bin/brightnessctl --class=backlight set "''$TARGET_BRIGHTNESS%"
     
+    # Save the brightness we just set so we can detect manual changes later
+    echo "''$TARGET_BRIGHTNESS" > "''$LAST_AUTO_BRIGHTNESS_FILE" 2>/dev/null || true
+    
     # Set keyboard backlight (inverted: bright screen = dim keyboard, dim screen = bright keyboard)
     # User preference: Level 1 (first level) for dark conditions, never use brightest settings
     ${pkgs.brightnessctl}/bin/brightnessctl --class=leds --device=asus::kbd_backlight set "''$TARGET_KBD_BRIGHTNESS" 2>/dev/null || true
@@ -148,6 +165,7 @@ let
   # Helper script to manually set brightness and disable auto-brightness temporarily
   # Usage: brightnessctl-manual set 50% (or any brightnessctl command)
   # This marks the change as manual, preventing auto-brightness from overriding for 30 seconds
+  # Also saves the brightness value so the auto-detection system knows what was set
   brightnessctl-manual = pkgs.writeScriptBin "brightnessctl-manual" ''
     #!${pkgs.bash}/bin/bash
     # Helper to set brightness manually and disable auto-brightness temporarily
@@ -157,6 +175,15 @@ let
     
     # Mark as manual change (touches timestamp file)
     touch "$HOME/.cache/manual-brightness-time" 2>/dev/null || true
+    
+    # Save the brightness value we just set (for screen brightness only)
+    # This helps the auto-detection system track manual changes
+    if echo "$*" | grep -q "backlight"; then
+      CURRENT_RAW=$(${pkgs.brightnessctl}/bin/brightnessctl --class=backlight get 2>/dev/null || echo "0")
+      CURRENT_MAX=$(${pkgs.brightnessctl}/bin/brightnessctl --class=backlight max 2>/dev/null || echo "100")
+      CURRENT_PERCENT=$((CURRENT_RAW * 100 / CURRENT_MAX))
+      echo "$CURRENT_PERCENT" > "$HOME/.cache/last-auto-brightness" 2>/dev/null || true
+    fi
   '';
   
   # swayidle startup script with configured timeouts
@@ -169,7 +196,7 @@ let
       timeout 180 '${brightness-save-restore}/bin/brightness-save-restore save && touch /tmp/auto-brightness-disabled && ${pkgs.brightnessctl}/bin/brightnessctl --class=backlight set 10% && KBD_BRIGHTNESS=$(${pkgs.brightnessctl}/bin/brightnessctl --class=leds --device=asus::kbd_backlight get 2>/dev/null || echo "0") && echo "$KBD_BRIGHTNESS" > "$HOME/.cache/niri-kbd-brightness-backup" && ${pkgs.brightnessctl}/bin/brightnessctl --class=leds --device=asus::kbd_backlight set 0' \
         resume '${brightness-save-restore}/bin/brightness-save-restore restore && rm -f /tmp/auto-brightness-disabled && if [ -f "$HOME/.cache/niri-kbd-brightness-backup" ]; then KBD_BRIGHTNESS=$(cat "$HOME/.cache/niri-kbd-brightness-backup"); ${pkgs.brightnessctl}/bin/brightnessctl --class=leds --device=asus::kbd_backlight set "$KBD_BRIGHTNESS" 2>/dev/null || true; rm -f "$HOME/.cache/niri-kbd-brightness-backup"; fi' \
       timeout 300 '${unstable.quickshell}/bin/qs -p ${noctalia-shell}/share/noctalia-shell ipc call lockScreen lock' \
-      timeout 900 '${brightness-save-restore}/bin/brightness-save-restore save && systemctl --user suspend' \
+      timeout 900 '${brightness-save-restore}/bin/brightness-save-restore save && loginctl suspend' \
         before-sleep '${unstable.quickshell}/bin/qs -p ${noctalia-shell}/share/noctalia-shell ipc call lockScreen lock'
   '';
   
@@ -513,7 +540,8 @@ in
 
   # Auto brightness service based on ambient light sensor
   # Polls sensor every 3 seconds and adjusts screen/keyboard brightness
-  # Includes manual override protection (30-second cooldown)
+  # Includes automatic manual override detection (30-second cooldown)
+  # Automatically detects manual brightness changes from any source (keyboard, widget, CLI)
   # Pauses when power saving dims the screen
   systemd.user.timers.auto-brightness-sensor = {
     description = "Auto brightness sensor timer";
@@ -563,7 +591,7 @@ in
       # timeout 900: After 15 minutes of inactivity, suspend system
       #   - Before suspend, save brightness (in case dimmed)
       #   - Lock screen before suspend (using Noctalia Shell's lock screen)
-      #   - Suspend using systemctl
+      #   - Suspend using loginctl (user-level suspend command)
       ExecStart = "${swayidle-start}";
       Restart = "on-failure";
       RestartSec = 5;
