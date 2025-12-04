@@ -42,15 +42,28 @@ let
     export __NV_PRIME_RENDER_OFFLOAD=0
     export __VK_LAYER_NV_optimus=
     
+    # Force Mesa to use AMD driver (radeonsi is the modern AMD driver)
+    export MESA_LOADER_DRIVER_OVERRIDE=radeonsi
+    # Ensure hardware acceleration on AMD (not software rendering)
+    export LIBGL_ALWAYS_SOFTWARE=0
+    
+    # Note: GBM_BACKEND should NOT be set to a device path for Electron apps
+    # MESA interprets it incorrectly and tries to construct invalid library paths
+    # Instead, rely on DRI_PRIME=0 and MESA_LOADER_DRIVER_OVERRIDE to force AMD
+    
     # For Electron/Chromium apps, disable NVIDIA GPU detection
     # These flags force Electron to use the integrated GPU (AMD)
     export ELECTRON_DISABLE_SANDBOX=1
     # Disable NVIDIA-specific optimizations
     export ELECTRON_USE_ANGLE=0
     
-    # For Chromium-based apps, force software rendering or AMD
-    # But we want hardware acceleration on AMD, so just prevent NVIDIA
+    # For Chromium-based apps, force EGL rendering on AMD
+    # Use --use-gl=egl to force EGL (works better with Wayland)
     export CHROMIUM_FLAGS="--use-gl=egl --disable-gpu-sandbox"
+    
+    # If crashes persist, try disabling GPU acceleration entirely:
+    # export ELECTRON_DISABLE_GPU=1
+    # export CHROMIUM_FLAGS="--disable-gpu"
     
     # Execute the command with AMD iGPU only
     exec "$@"
