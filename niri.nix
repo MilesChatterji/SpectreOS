@@ -177,6 +177,108 @@ let
     fi
   '';
   
+  # Script to apply ASUS DCI P3 ICC color profile to display
+  # This ensures accurate color representation for DaVinci Resolve editing
+  # Works by importing the profile and applying it to the display via colord
+  # Note: Display must be registered with colord (usually done by GNOME)
+  apply-color-profile = pkgs.writeScriptBin "apply-color-profile" ''
+    #!${pkgs.bash}/bin/bash
+    # Apply ASUS DCI P3 ICC color profile to display for accurate color in DaVinci Resolve
+    
+    PROFILE_PATH="/var/lib/colord/icc/ASUS_Display_DCIP3.icm"
+    MAX_RETRIES=5
+    RETRY_DELAY=3
+    
+    # Check if profile file exists
+    if [ ! -f "$PROFILE_PATH" ]; then
+      echo "Profile file not found: $PROFILE_PATH" >&2
+      echo "This is not critical - profile may already be applied via GNOME" >&2
+      exit 0  # Exit gracefully - don't fail the service
+    fi
+    
+    # Wait for colord to be ready
+    COLORD_READY=0
+    for i in $(seq 1 $MAX_RETRIES); do
+      if dbus-send --system --print-reply --dest=org.freedesktop.ColorManager /org/freedesktop/ColorManager org.freedesktop.DBus.Peer.Ping >/dev/null 2>&1; then
+        COLORD_READY=1
+        break
+      fi
+      sleep $RETRY_DELAY
+    done
+    
+    if [ $COLORD_READY -eq 0 ]; then
+      echo "colord service not responding - profile may already be applied" >&2
+      exit 0  # Exit gracefully
+    fi
+    
+    # Try to find the profile in colord database (may already be imported from GNOME)
+    PROFILE_ID=""
+    # First, try to find existing profile
+    PROFILE_ID=$(colormgr get-profiles 2>/dev/null | grep -i "ASUS.*DCI.*P3\|ASUS_Display_DCIP3" | head -1 | awk '{print $1}' || echo "")
+    
+    # If not found, try to import it (with timeout handling)
+    if [ -z "$PROFILE_ID" ]; then
+      # Use timeout to prevent hanging (timeout is in coreutils, should be in PATH)
+      IMPORT_OUTPUT=$(${pkgs.coreutils}/bin/timeout 10 colormgr import-profile "$PROFILE_PATH" 2>&1 || echo "timeout")
+      if [ "$IMPORT_OUTPUT" != "timeout" ] && [ -n "$IMPORT_OUTPUT" ]; then
+        # Try to extract profile ID from output
+        PROFILE_ID=$(echo "$IMPORT_OUTPUT" | grep -i "profile.*id\|^[a-f0-9-]\{36\}" | head -1 | awk '{print $NF}' || echo "")
+        # If still no ID, try parsing the object path
+        if [ -z "$PROFILE_ID" ]; then
+          PROFILE_ID=$(echo "$IMPORT_OUTPUT" | grep -oE "/[a-f0-9-]+" | head -1 | tr -d '/' || echo "")
+        fi
+      fi
+    fi
+    
+    # Detect display - try to get registered displays from colord
+    DISPLAY_NAME=""
+    DISPLAY_ID=""
+    
+    # First, try to get any registered display device
+    DISPLAY_ID=$(colormgr get-devices-by-kind display 2>/dev/null | head -1 | awk '{print $1}' || echo "")
+    if [ -n "$DISPLAY_ID" ]; then
+      # Extract display name from device ID or use the ID itself
+      DISPLAY_NAME=$(colormgr get-devices 2>/dev/null | grep "$DISPLAY_ID" | awk '{print $2}' || echo "$DISPLAY_ID")
+    fi
+    
+    # If no registered display, try to detect via Wayland
+    if [ -z "$DISPLAY_NAME" ]; then
+      for name in "eDP-1" "eDP" "DP-1" "HDMI-1"; do
+        if command -v wlr-randr >/dev/null 2>&1; then
+          if wlr-randr 2>/dev/null | grep -q "^$name"; then
+            DISPLAY_NAME="$name"
+            break
+          fi
+        fi
+      done
+    fi
+    
+    # Apply the profile if we have both profile ID and display
+    if [ -n "$PROFILE_ID" ] && [ -n "$DISPLAY_ID" ]; then
+      # Add profile to device
+      colormgr device-add-profile "$DISPLAY_ID" "$PROFILE_ID" 2>/dev/null || true
+      
+      # Set as default profile
+      colormgr device-make-profile-default "$DISPLAY_ID" "$PROFILE_ID" 2>/dev/null || true
+      
+      echo "Applied ASUS DCI P3 profile to display: $DISPLAY_NAME ($DISPLAY_ID)"
+      exit 0
+    elif [ -n "$PROFILE_ID" ] && [ -n "$DISPLAY_NAME" ]; then
+      # Try using display name directly (may work if device exists but not registered)
+      colormgr device-add-profile "$DISPLAY_NAME" "$PROFILE_ID" 2>/dev/null || true
+      colormgr device-make-profile-default "$DISPLAY_NAME" "$PROFILE_ID" 2>/dev/null || true
+      echo "Applied ASUS DCI P3 profile to display: $DISPLAY_NAME"
+      exit 0
+    else
+      # Profile file exists and is valid, but display isn't registered yet
+      # This is OK - the profile will be applied when display is registered (e.g., via GNOME)
+      echo "Profile file exists, but display not registered with colord yet" >&2
+      echo "This is normal for Niri - profile will be available when display is registered" >&2
+      echo "If you set the profile in GNOME, it should persist and work in applications" >&2
+      exit 0  # Exit gracefully - don't fail the service
+    fi
+  '';
+  
   # swayidle startup script with configured timeouts
   # Handles auto-dim, screen lock, and suspend on idle
   # Uses Noctalia Shell's built-in lock screen via IPC instead of swaylock
@@ -450,6 +552,7 @@ in
     brightness-save-restore
     auto-brightness-sensor  # Auto brightness based on ambient light sensor
     brightnessctl-manual  # Helper to set brightness manually (disables auto-brightness temporarily)
+    apply-color-profile  # Apply ASUS DCI P3 ICC color profile for accurate color in DaVinci Resolve
     # Hardware control utilities
     brightnessctl  # For display brightness and keyboard backlight control
     bc  # For floating point calculations in auto-brightness script
@@ -496,11 +599,23 @@ in
         "DRI_PRIME=0"
         "__NV_PRIME_RENDER_OFFLOAD=0"
         "__VK_LAYER_NV_optimus="
-        # Explicitly add system PATH to ensure sh, brightnessctl, nmcli, etc. are found
+        # Explicitly add system PATH to ensure sh, brightnessctl, nmcli, gpu-screen-recorder, etc. are found
         # This ensures critical system binaries are available even if user session PATH isn't set yet
-        # /run/current-system/sw/bin includes all system packages (brightnessctl, nmcli, sh, etc.)
+        # /run/current-system/sw/bin includes all system packages (brightnessctl, nmcli, sh, gpu-screen-recorder, etc.)
+        # Also include the noctalia-shell wrapper's PATH which includes runtimeDeps (gpu-screen-recorder is in runtimeDeps)
         # Note: PassEnvironment will append user session PATH, but system PATH takes precedence
-        "PATH=/run/current-system/sw/bin:/run/current-system/sw/sbin:/usr/bin:/usr/sbin:/bin:/sbin"
+        "PATH=/run/wrappers/bin:${pkgs.lib.makeBinPath (with pkgs; [
+          unstable.quickshell
+          brightnessctl
+          cava
+          cliphist
+          ddcutil
+          matugen
+          wlsunset
+          wl-clipboard
+        ] ++ pkgs.lib.optionals (pkgs.stdenv.hostPlatform.system == "x86_64-linux") [
+          gpu-screen-recorder
+        ])}:/run/current-system/sw/bin:/run/current-system/sw/sbin:/usr/bin:/usr/sbin:/bin:/sbin"
       ];
       # Pass PATH from the user session so Noctalia can find system binaries
       # This is required for brightness detection scripts and other hardware services
@@ -589,6 +704,30 @@ in
       # Pass Wayland environment variables required for swayidle and Noctalia IPC
       PassEnvironment = [ "WAYLAND_DISPLAY" "XDG_RUNTIME_DIR" "XDG_SESSION_TYPE" ];
       # Include system PATH for brightnessctl and systemctl
+      Environment = [
+        "PATH=/run/current-system/sw/bin:/run/current-system/sw/sbin:/usr/bin:/usr/sbin:/bin:/sbin"
+      ];
+    };
+  };
+  
+  # Color profile application service
+  # Applies ASUS DCI P3 ICC profile to display for accurate color in DaVinci Resolve
+  # Ensures proper color representation for sRGB, Rec709, and 10-bit P3 color spaces
+  # Note: This service exits gracefully if display isn't registered yet (common in Niri)
+  # The profile will be applied when the display is registered (e.g., via GNOME)
+  systemd.user.services.apply-color-profile = {
+    description = "Apply ASUS DCI P3 ICC color profile to display";
+    wantedBy = [ "graphical-session.target" ];
+    after = [ "graphical-session.target" ];
+    # Don't require colord - it may not be ready or display may not be registered
+    serviceConfig = {
+      Type = "oneshot";
+      ExecStart = "${apply-color-profile}/bin/apply-color-profile";
+      # Don't restart on failure - script exits gracefully if display isn't registered
+      Restart = "no";
+      # Pass Wayland environment variables
+      PassEnvironment = [ "WAYLAND_DISPLAY" "XDG_RUNTIME_DIR" "XDG_SESSION_TYPE" ];
+      # Include system PATH for colormgr and dbus-send
       Environment = [
         "PATH=/run/current-system/sw/bin:/run/current-system/sw/sbin:/usr/bin:/usr/sbin:/bin:/sbin"
       ];

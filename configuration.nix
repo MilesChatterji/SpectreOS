@@ -96,6 +96,11 @@ in
   # Enable CUPS to print documents.
   services.printing.enable = true;
 
+  # Color management service (colord)
+  # Manages ICC color profiles for displays and printers
+  # Profiles set in GNOME will persist and work across all sessions (including Niri)
+  services.colord.enable = true;
+
   # Enable sound with pipewire.
   services.pulseaudio.enable = false;
   security.rtkit.enable = true;
@@ -137,6 +142,10 @@ in
   # Allow unfree packages
   nixpkgs.config.allowUnfree = true;
 
+  # Enable experimental Nix features
+  # nix-command: Enables the new nix command (nix search, nix shell, etc.)
+  nix.settings.experimental-features = [ "nix-command" "flakes" ];
+
   # List packages installed in system profile. To search, run:
   # $ nix search wget
   # Most user packages have been migrated to Home Manager
@@ -149,6 +158,7 @@ in
   fwupd   # System firmware updates
   busybox # System utilities
   lshw    # Hardware info (system-level)
+  colord  # Color management daemon (for ICC profile management)
   ];
 
   # Autostart systemd systemctl configs for apps that should open with other apps. 
@@ -165,6 +175,17 @@ in
   #   enable = true;
   #   enableSSHSupport = true;
   # };
+
+  # Security wrapper for gsr-kms-server to grant sys_admin capability
+  # gpu-screen-recorder requires gsr-kms-server to have sys_admin capability
+  # to access DRM/KMS devices without root privileges
+  # This wrapper will be created at /run/wrappers/bin/gsr-kms-server
+  security.wrappers.gsr-kms-server = {
+    source = "${pkgs.gpu-screen-recorder}/bin/gsr-kms-server";
+    owner = "root";
+    group = "root";
+    capabilities = "cap_sys_admin+ep";
+  };
 
   # List services that you want to enable:
 
