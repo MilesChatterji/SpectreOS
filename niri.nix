@@ -451,7 +451,7 @@ let
       owner = "noctalia-dev";
       repo = "noctalia-shell";
       rev = "main";
-      sha256 = "sha256-+pA0uczwv4mrJqAZNzJmdKtfCKPComNfQ7HDc/2+RVU=";  # Updated for NixOS 25.11
+      sha256 = "sha256-/ziQ2Uh8EOoOYZj07MpLy40XhbBMqOyov1yt6bN34Aw=";  # Updated to latest main
     };
     
     nativeBuildInputs = with pkgs; [

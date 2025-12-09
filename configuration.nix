@@ -2,9 +2,176 @@
 # your system.  Help is available in the configuration.nix(5) man page
 # and in the NixOS manual (accessible by running ‘nixos-help’).
 
-{ config, pkgs, ... }:
+{ config, pkgs, lib, ... }:
 let 
    unstable = import <unstable> { config.allowUnfree = true; };
+   
+   # Custom SpectreOS Plymouth theme - Step 2: Logo + Progress Bars
+   spectreos-plymouth-theme = pkgs.runCommand "spectreos-plymouth-theme" {
+     splashImage = builtins.path {
+       path = /etc/nixos/assets/logo.png;
+       name = "spectreos-logo.png";
+     };
+     progressBox = builtins.path {
+       path = /etc/nixos/assets/progress_box.png;
+       name = "progress_box.png";
+     };
+     progressBar = builtins.path {
+       path = /etc/nixos/assets/progress_bar.png;
+       name = "progress_bar.png";
+     };
+   } ''
+     mkdir -p $out/share/plymouth/themes/spectreos
+     
+     # Copy all images
+     cp $splashImage $out/share/plymouth/themes/spectreos/logo.png
+     cp $progressBox $out/share/plymouth/themes/spectreos/progress_box.png
+     cp $progressBar $out/share/plymouth/themes/spectreos/progress_bar.png
+     
+     # Create theme configuration file
+     cat > $out/share/plymouth/themes/spectreos/spectreos.plymouth <<EOF
+     [Plymouth Theme]
+     Name=SpectreOS
+     Description=SpectreOS Boot Splash
+     ModuleName=script
+     
+     [script]
+     ImageDir=$out/share/plymouth/themes/spectreos
+     ScriptFile=$out/share/plymouth/themes/spectreos/spectreos.script
+     EOF
+     
+     # Create script to display logo and progress bars
+     cat > $out/share/plymouth/themes/spectreos/spectreos.script <<'SCRIPT'
+     # SpectreOS Plymouth Theme Script
+     
+     # Set background to black
+     Window.SetBackgroundTopColor(0.00, 0.00, 0.00);
+     Window.SetBackgroundBottomColor(0.00, 0.00, 0.00);
+     
+     # Load images and create sprites immediately (at script load time)
+     logo.image = Image("logo.png");
+     logo.sprite = Sprite(logo.image);
+     
+     progress_box.image = Image("progress_box.png");
+     progress_box.sprite = Sprite(progress_box.image);
+     
+     progress_bar.original_image = Image("progress_bar.png");
+     progress_bar.image = progress_bar.original_image;
+     progress_bar.sprite = Sprite(progress_bar.image);
+     
+     # Immediately set opacity to ensure sprites are visible
+     logo.sprite.SetOpacity(1);
+     progress_box.sprite.SetOpacity(1);
+     progress_bar.sprite.SetOpacity(1);
+     
+     # Function to position all elements
+     fun refresh_callback() {
+       screen_width = Window.GetWidth();
+       screen_height = Window.GetHeight();
+       
+       # Only position if we have valid dimensions
+       if (screen_width > 0 && screen_height > 0) {
+         # Center the logo vertically and horizontally
+         logo_width = logo.image.GetWidth();
+         logo_height = logo.image.GetHeight();
+         logo_x = Window.GetX() + (screen_width - logo_width) / 2;
+         logo_y = Window.GetY() + (screen_height - logo_height) / 2 - 100; # Slightly above center
+         logo.sprite.SetPosition(logo_x, logo_y, 1000);
+         logo.sprite.SetOpacity(1);
+         
+         # Position progress box: centered horizontally, near bottom of screen for visibility
+         progress_box_width = progress_box.image.GetWidth();
+         progress_box_height = progress_box.image.GetHeight();
+         progress_box_x = Window.GetX() + (screen_width - progress_box_width) / 2;
+         # Place at bottom of screen with some padding
+         progress_box_y = Window.GetY() + screen_height - progress_box_height - 100;
+         
+         # Store box position for progress bar positioning
+         progress_box.x = progress_box_x;
+         progress_box.y = progress_box_y;
+         
+         progress_box.sprite.SetPosition(progress_box_x, progress_box_y, 2000);
+         progress_box.sprite.SetOpacity(1);
+         
+         # Position progress bar: centered inside the box
+         # Use current scaled width (or original if not scaled yet)
+         current_bar_width = progress_bar.image.GetWidth();
+         current_bar_height = progress_bar.image.GetHeight();
+         box_padding_x = (progress_box_width - current_bar_width) / 2;
+         box_padding_y = (progress_box_height - current_bar_height) / 2;
+         progress_bar_x = progress_box_x + box_padding_x;
+         progress_bar_y = progress_box_y + box_padding_y;
+         progress_bar.sprite.SetPosition(progress_bar_x, progress_bar_y, 3000);
+         progress_bar.sprite.SetOpacity(1);
+       } else {
+         # If dimensions not available, use fixed positions for testing
+         logo.sprite.SetPosition(100, 100, 1000);
+         logo.sprite.SetOpacity(1);
+         progress_box.sprite.SetPosition(100, 600, 2000);
+         progress_box.sprite.SetOpacity(1);
+         progress_bar.sprite.SetPosition(100, 650, 3000);
+         progress_bar.sprite.SetOpacity(1);
+       }
+     }
+     
+     # Set refresh function to keep everything positioned
+     Plymouth.SetRefreshFunction(refresh_callback);
+     
+     # Try to position elements immediately (may not work if display not ready)
+     # This ensures sprites are at least created and visible
+     refresh_callback();
+     
+     # Initialize display when ready - position elements when display is available
+     fun OnDisplayInit() {
+       refresh_callback();
+     }
+     
+     # Function to handle boot progress updates
+     fun OnBootProgress(duration, progress) {
+       # Calculate new width based on progress (0.0 to 1.0)
+       new_width = Math.Int(progress_bar.original_image.GetWidth() * progress);
+       
+       # Ensure minimum width for visibility
+       if (new_width < 1) {
+         new_width = 1;
+       }
+       
+       # Scale the progress bar image horizontally
+       progress_bar.image = progress_bar.original_image.Scale(new_width, progress_bar.original_image.GetHeight());
+       progress_bar.sprite.SetImage(progress_bar.image);
+       
+       # Recalculate position to keep it centered in the box
+       screen_width = Window.GetWidth();
+       screen_height = Window.GetHeight();
+       if (screen_width > 0 && screen_height > 0) {
+         # Get current box position (stored in refresh_callback)
+         progress_box_width = progress_box.image.GetWidth();
+         progress_box_height = progress_box.image.GetHeight();
+         progress_box_x = Window.GetX() + (screen_width - progress_box_width) / 2;
+         progress_box_y = Window.GetY() + screen_height - progress_box_height - 100;
+         
+         # Center the scaled progress bar inside the box
+         current_bar_width = progress_bar.image.GetWidth();
+         current_bar_height = progress_bar.image.GetHeight();
+         box_padding_x = (progress_box_width - current_bar_width) / 2;
+         box_padding_y = (progress_box_height - current_bar_height) / 2;
+         progress_bar_x = progress_box_x + box_padding_x;
+         progress_bar_y = progress_box_y + box_padding_y;
+         progress_bar.sprite.SetPosition(progress_bar_x, progress_bar_y, 3000);
+       }
+     }
+     
+     # Register boot progress callback
+     Plymouth.SetBootProgressFunction(OnBootProgress);
+     
+     # Function called when Plymouth quits
+     fun OnQuit() {
+       logo.sprite.SetOpacity(0);
+       progress_box.sprite.SetOpacity(0);
+       progress_bar.sprite.SetOpacity(0);
+     }
+     SCRIPT
+   '';
 in
 
 {
@@ -21,7 +188,17 @@ in
 
   # Bootloader.
   boot.loader.systemd-boot.enable = true;
+  # Use "auto" to let systemd-boot pick a suitable console mode
+  boot.loader.systemd-boot.consoleMode = "auto";
   boot.loader.efi.canTouchEfiVariables = true;
+
+  # Plymouth boot splash screen
+  # Step 1: Custom theme with logo only (progress bars will be added next)
+  boot.plymouth = {
+    enable = true;
+    theme = "spectreos";
+    themePackages = [ spectreos-plymouth-theme ];
+  };
 
   # Use latest kernel.
   boot.kernelPackages = pkgs.linuxPackages_latest;
