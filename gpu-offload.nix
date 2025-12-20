@@ -92,6 +92,11 @@ in
     # NVIDIA can still be used for compute/rendering via nvidia-offload (PRIME offload)
     # Testing: GNOME may still work, but if it breaks, rollback with: nixos-rebuild switch --rollback
     # This should reduce power consumption in Niri and fix brightness controls
+    # 
+    # NOTE: If DP-MST (daisy-chained monitors) doesn't work and your USB-C port
+    # is connected to NVIDIA, you may need to temporarily enable modesetting:
+    # modesetting.enable = true;
+    # This will allow NVIDIA to handle display output, which may be needed for MST.
     modesetting.enable = false;
     
     # Enable power management (allows GPU to power down when not in use)

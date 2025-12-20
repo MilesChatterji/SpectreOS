@@ -363,11 +363,17 @@ let
         sed -i "s|render-drm-device \"/dev/dri/renderD[0-9]*\"|render-drm-device \"/dev/dri/$AMD_RENDER\"|g" "$NIRI_CONFIG"
         echo "Updated Niri config: render-drm-device = /dev/dri/$AMD_RENDER"
       fi
+      
+      # Note: MST outputs that fail via IPC should be added to config.kdl manually
+      # Example: output "DP-11" { mode "3840x2160@60.000" }
     fi
     
     # CRITICAL: Set environment variables BEFORE any GPU access
     # WLR_DRM_DEVICES forces the compositor (Niri) to use AMD iGPU only
     # This must be set before Niri starts to prevent NVIDIA detection
+    # Note: MST (Multi-Stream Transport) should work with this setting as long as
+    # the USB-C/DP port is connected to the AMD card. If MST still doesn't work,
+    # try removing this line temporarily to allow MST probing of all cards.
     export WLR_DRM_DEVICES=/dev/dri/$AMD_CARD
     # Prevent Niri from using NVIDIA-specific DRM modifiers
     export WLR_DRM_NO_MODIFIERS=1
@@ -450,8 +456,8 @@ let
     src = pkgs.fetchFromGitHub {
       owner = "noctalia-dev";
       repo = "noctalia-shell";
-      rev = "main";
-      sha256 = "sha256-/ziQ2Uh8EOoOYZj07MpLy40XhbBMqOyov1yt6bN34Aw=";  # Updated to latest main
+      rev = "v3.7.1";
+      sha256 = "sha256-nlimljubh2NCfSllK5QGEgqcJO92nT5JXz4Bpk5m6hw=";  # v3.7.1 release
     };
     
     nativeBuildInputs = with pkgs; [
@@ -539,6 +545,71 @@ let
     mkdir -p $out/share/wayland-sessions
     install -m 644 ${niri-amd-desktop} $out/share/wayland-sessions/niri.desktop
   '';
+  
+  # Script to auto-enable MST (DisplayPort Multi-Stream Transport) outputs
+  # Detects connected but disabled DP outputs and enables them automatically
+  # This is needed because MST outputs are detected but not enabled by default
+  # 
+  # IMPORTANT: This script dynamically detects displays - it does NOT hardcode display names.
+  # Display names (DP-9, DP-10, DP-13, etc.) can change after disconnect/reconnect due to MST topology.
+  # The script scans all outputs and enables any that are disabled, regardless of their names.
+  enable-mst-outputs = pkgs.writeScriptBin "enable-mst-outputs" ''
+    #!${pkgs.bash}/bin/bash
+    # Auto-enable MST (DisplayPort Multi-Stream Transport) outputs
+    # Waits for Niri to start, then enables any connected but disabled DP outputs
+    # 
+    # This script dynamically detects displays - display names (DP-9, DP-10, etc.) can change
+    # after disconnect/reconnect, so we scan all outputs rather than hardcoding names.
+    
+    # Wait for Niri to be ready (check if WAYLAND_DISPLAY is set or niri process exists)
+    MAX_WAIT=30
+    WAITED=0
+    while [ $WAITED -lt $MAX_WAIT ]; do
+      if [ -n "$WAYLAND_DISPLAY" ] || pgrep -x niri >/dev/null 2>&1; then
+        break
+      fi
+      sleep 1
+      WAITED=$((WAITED + 1))
+    done
+    
+    # Additional wait for outputs to be detected (MST topology can take time)
+    sleep 3
+    
+    # Use niri msg output to enable connected but disabled outputs
+    # Niri has its own IPC command for output management - wlr-randr doesn't work with Niri
+    # NOTE: Some MST outputs may fail to enable via IPC due to DRM errors.
+    # In that case, they need to be added to ~/.config/niri/config.kdl manually.
+    if command -v niri >/dev/null 2>&1; then
+      # Parse niri msg outputs to find disabled outputs
+      # Extract output names from parentheses using grep and awk
+      niri msg outputs 2>/dev/null | grep -E "\(DP-[0-9]+\)|\(HDMI-[0-9]+\)|\(eDP-[0-9]+\)" | while read -r line; do
+        # Extract output name from parentheses using awk (more reliable than sed in Nix strings)
+        OUTPUT_NAME=$(echo "$line" | awk -F'[()]' '{for(i=2;i<=NF;i+=2) if($i ~ /^(DP|HDMI|eDP)-[0-9]+$/) print $i}')
+        if [ -n "$OUTPUT_NAME" ]; then
+          # Check if this output is disabled - use grep to check for "Disabled" in the output block
+          # Get the full output block and check if it contains "Disabled" on its own line
+          if niri msg outputs 2>/dev/null | grep -A 5 "$OUTPUT_NAME" | grep -q "^[[:space:]]*Disabled$"; then
+            echo "Enabling disabled output: $OUTPUT_NAME"
+            # Try to enable the output - may need mode set first for MST
+            # Set preferred mode first, then enable
+            PREFERRED_MODE=$(niri msg outputs 2>/dev/null | grep -A 20 "$OUTPUT_NAME" | grep -oE "[0-9]+x[0-9]+@[0-9.]+" | head -1)
+            if [ -n "$PREFERRED_MODE" ]; then
+              niri msg output "$OUTPUT_NAME" mode "$PREFERRED_MODE" 2>/dev/null || true
+              sleep 0.5
+            fi
+            # Try to enable - if this fails due to DRM error, the output needs to be in config.kdl
+            if ! niri msg output "$OUTPUT_NAME" on 2>/dev/null; then
+              echo "WARNING: Failed to enable $OUTPUT_NAME via IPC (DRM error)."
+              echo "  Add this to ~/.config/niri/config.kdl:"
+              echo "  output \"$OUTPUT_NAME\" {"
+              echo "    mode \"$PREFERRED_MODE\""
+              echo "  }"
+            fi
+          fi
+        fi
+      done
+    fi
+  '';
 in
 {
   environment.systemPackages = with pkgs; [
@@ -557,6 +628,8 @@ in
     brightnessctl  # For display brightness and keyboard backlight control
     bc  # For floating point calculations in auto-brightness script
     wlsunset  # For nightlight (blue light filter) functionality
+    wlr-randr  # Display configuration tool for Wayland (needed for MST output management)
+    enable-mst-outputs  # Script to auto-enable MST outputs on Niri startup
     # Power management
     swayidle  # Wayland idle management daemon for auto-dim, lock, and suspend
     # Note: Using Noctalia Shell's built-in lock screen via IPC instead of swaylock
@@ -621,6 +694,49 @@ in
       # This is required for brightness detection scripts and other hardware services
       # The system PATH above ensures critical binaries are always available
       PassEnvironment = [ "PATH" ];
+    };
+  };
+  
+  # Auto-enable MST outputs service
+  # Runs after Niri starts to enable any connected but disabled MST outputs
+  # This fixes the issue where MST daisy-chained monitors are detected but not enabled
+  # IMPORTANT: Script dynamically detects displays - names (DP-9, DP-10, etc.) can change
+  # after disconnect/reconnect, so it scans all outputs rather than hardcoding names.
+  systemd.user.services.enable-mst-outputs = {
+    description = "Enable MST (DisplayPort Multi-Stream Transport) outputs";
+    wantedBy = [ "graphical-session.target" ];
+    after = [ "graphical-session.target" ];
+    # Wait a bit longer to ensure Niri is fully initialized
+    serviceConfig = {
+      ExecStart = "${enable-mst-outputs}/bin/enable-mst-outputs";
+      Type = "oneshot";
+      RemainAfterExit = false;
+    };
+  };
+  
+  # Path unit to re-run MST enable script when displays are hotplugged
+  # This handles disconnect/reconnect scenarios where display names may change
+  # Monitors /sys/class/drm for display connection changes
+  # Note: Display names (DP-9, DP-10, DP-13, etc.) can change after reconnect due to MST topology
+  systemd.user.paths.enable-mst-outputs-on-hotplug = {
+    description = "Monitor for display hotplug events";
+    wantedBy = [ "graphical-session.target" ];
+    pathConfig = {
+      # Monitor for changes in DRM connector status files
+      # This triggers when displays are connected/disconnected
+      # Note: Wildcards in paths require MakeDirectory=yes or systemd may not detect changes
+      PathChanged = "/sys/class/drm";
+    };
+  };
+  
+  # Service triggered by the path unit above
+  # Re-runs the MST enable script when displays are connected/disconnected
+  # The script dynamically detects all outputs, so it works even if names changed
+  systemd.user.services.enable-mst-outputs-on-hotplug = {
+    description = "Enable MST outputs after display hotplug";
+    serviceConfig = {
+      ExecStart = "${pkgs.bash}/bin/bash -c 'sleep 2 && ${enable-mst-outputs}/bin/enable-mst-outputs'";
+      Type = "oneshot";
     };
   };
 
