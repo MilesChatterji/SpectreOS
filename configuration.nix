@@ -349,6 +349,7 @@ in
   busybox # System utilities
   lshw    # Hardware info (system-level)
   colord  # Color management daemon (for ICC profile management)
+  nvtopPackages.full
   ];
 
   # Autostart systemd systemctl configs for apps that should open with other apps. 

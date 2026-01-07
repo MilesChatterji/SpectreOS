@@ -14,6 +14,34 @@ let
     # NVIDIA PRIME offload wrapper
     # Forces applications to use NVIDIA GPU instead of AMD iGPU
     
+    # Preserve audio environment variables (for PipeWire/PulseAudio)
+    # These are needed for applications that use audio (DaVinci Resolve, etc.)
+    if [ -n "$XDG_RUNTIME_DIR" ]; then
+      export XDG_RUNTIME_DIR
+      export PIPEWIRE_RUNTIME_DIR="$XDG_RUNTIME_DIR"
+      export PULSE_RUNTIME_PATH="$XDG_RUNTIME_DIR/pulse"
+      # Set PULSE_SERVER for PulseAudio compatibility (PipeWire emulates PulseAudio)
+      export PULSE_SERVER="unix:$XDG_RUNTIME_DIR/pulse/native"
+    fi
+    # ALSA configuration - route through PulseAudio/PipeWire
+    # DaVinci Resolve uses ALSA directly, so we need to ensure it routes through PipeWire
+    # Force PulseAudio as the default PCM device
+    export ALSA_PCM_NAME=pulse
+    # Set ALSA plugin directory so ALSA can find the PulseAudio plugin
+    # This is needed for FHS environments (like DaVinci Resolve) that may not have
+    # the plugin in their default library search path
+    export ALSA_PLUGIN_DIR="${pkgs.alsa-plugins}/lib/alsa-lib"
+    # Ensure ALSA library can find the PulseAudio plugin
+    # Add alsa-plugins to library path so the plugin is accessible from FHS environment
+    # Prepend to preserve any existing library paths (important for FHS environments)
+    if [ -z "$LD_LIBRARY_PATH" ]; then
+      export LD_LIBRARY_PATH="${pkgs.alsa-plugins}/lib"
+    else
+      export LD_LIBRARY_PATH="${pkgs.alsa-plugins}/lib:$LD_LIBRARY_PATH"
+    fi
+    # Note: The FHS environment should have its own library paths set up
+    # We're only adding the alsa-plugins path, not replacing the entire LD_LIBRARY_PATH
+    
     # NVIDIA PRIME render offload (for modern applications)
     export __NV_PRIME_RENDER_OFFLOAD=1
     export __GLX_VENDOR_LIBRARY_NAME=nvidia
