@@ -204,17 +204,12 @@ in
   boot.kernelPackages = pkgs.linuxPackages_latest;
   
   # Kernel parameters for DisplayPort Multi-Stream Transport (DP-MST) support
-  # Enable MST debugging and ensure MST is properly initialized
-  # This helps with daisy-chained monitors via USB-C -> DP
-  boot.kernelParams = [
-    # Enable DRM debug output for MST and connector/encoder debugging
-    # 0x04 = MST debug
-    # 0x08 = connector/encoder debug  
-    # 0x10 = atomic/state debug
-    # 0x1e = all of the above (most verbose)
-    "drm.debug=0x1e"  # Enable comprehensive DRM debug output for MST troubleshooting
-    # Note: MST should be enabled by default, but explicit parameters help with debugging
-  ];
+  # Note: MST debugging removed - was causing excessive logging and performance issues
+  # MST is enabled by default in the kernel
+  # To re-enable MST debugging in the future (if needed), add: "drm.debug=0x04" (MST only, less verbose)
+  # boot.kernelParams = [
+  #   "drm.debug=0x04"  # MST debug only (much less verbose than 0x1e)
+  # ];
   
   #Asus specific firmware controllers
   services.fwupd.enable = true;
