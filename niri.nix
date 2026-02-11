@@ -456,8 +456,8 @@ let
     src = pkgs.fetchFromGitHub {
       owner = "noctalia-dev";
       repo = "noctalia-shell";
-      rev = "v4.4.0";
-      sha256 = "sha256-znMQB8MzaWc6XnKe77+Pb/JgLI0LZmuSaZ3sijW6D1w=";  # v4.4.0 release
+      rev = "v4.4.2";
+      sha256 = "sha256-uNLOfzlHhykGfrD5hEN+7Dw+W2XVyobTAy8mxoxKwjw=";  # v4.4.2 release
     };
     
     nativeBuildInputs = with pkgs; [
