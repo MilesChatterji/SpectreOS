@@ -2,10 +2,47 @@
 # Use AMD 890M iGPU by default, NVIDIA only when explicitly requested via nvidia-offload
 # This reduces power consumption significantly
 # System: AMD Ryzen AI 9 HX 370 with Radeon 890M (card1/amdgpu) + NVIDIA discrete (card0/nvidia)
+#
+# NOTE (2025-02-07): NVIDIA driver is pulled from nixos-unstable (580.126.18+) so it builds
+# on kernel 6.19.x. Stable channel (e.g. 25.11) still had 580.119.02 which does not build on 6.19.
+# Only this package comes from unstable; rest of system stays on your channel.
+# TODO: When your NixOS channel has nvidia 580.126.18+ in stable, revert to:
+#   package = config.boot.kernelPackages.nvidiaPackages.production;
+# and remove the unstable fetch/import and unstableNvidiaPackages in the let block below.
 
 { config, pkgs, ... }:
 
 let
+  # Import nixpkgs-unstable only for the NVIDIA driver (580.126.18+).
+  # The driver is built against your current kernel (config.boot.kernelPackages)
+  # so the rest of the system stays on your channel (e.g. 25.11).
+  unstableSrc = builtins.fetchTarball {
+    url = "https://github.com/NixOS/nixpkgs/archive/nixos-unstable.tar.gz";
+    # Omit sha256 to track latest unstable; add sha256 to pin to a specific tarball.
+  };
+  unstable = import unstableSrc {
+    config.allowUnfree = true;
+    inherit (config.nixpkgs) system;
+  };
+  # nvidia-x11 gets kernel from the package set via internal callPackage. The top-level
+  # unstable set has no "kernel"; we override callPackage so every call injects our kernel.
+  ourKernel = config.boot.kernelPackages.kernel;
+  # Inject kernel when the called function has a 'kernel' argument.
+  # Only pass our callPackage when calling the top-level nvidia-x11 default.nix, so inner
+  # callPackage (e.g. settings.nix) are not given unexpected 'callPackage'.
+  nvidiaX11Path = unstableSrc + "/pkgs/os-specific/linux/nvidia-x11";
+  unstableWithOurKernel = unstable // {
+    kernel = ourKernel;
+    callPackage = fn: args:
+      let
+        inject = if builtins.isFunction fn && builtins.functionArgs fn ? kernel then { kernel = ourKernel; } else { };
+        passOurCallPackage = if fn == nvidiaX11Path then { callPackage = unstableWithOurKernel.callPackage; } else { };
+        args' = args // inject // passOurCallPackage;
+      in
+      unstable.callPackage fn args';
+  };
+  unstableNvidiaPackages = unstableWithOurKernel.callPackage (unstableSrc + "/pkgs/os-specific/linux/nvidia-x11") { };
+
   # NVIDIA offload wrapper script
   # Use this to run applications on the NVIDIA GPU instead of AMD iGPU
   # Example: nvidia-offload davinci-resolve
@@ -133,8 +170,9 @@ in
     # Enable support for 32-bit applications (needed for some games/apps)
     nvidiaSettings = true;
     
-    # Package set - use the latest stable drivers
-    package = config.boot.kernelPackages.nvidiaPackages.stable;
+    # Use production driver from nixpkgs-unstable (580.126.18+) built for current kernel.
+    # See NOTE at top of file (2025-02-07): revert to .nvidiaPackages.production when stable has it.
+    package = unstableNvidiaPackages.production;
   };
   
   # Set environment variables for PRIME offloading
