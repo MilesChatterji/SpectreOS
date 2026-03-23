@@ -288,9 +288,9 @@ let
     ${pkgs.swayidle}/bin/swayidle -w \
       timeout 180 '${brightness-save-restore}/bin/brightness-save-restore save && touch /tmp/auto-brightness-disabled && ${pkgs.brightnessctl}/bin/brightnessctl --class=backlight set 10% && KBD_BRIGHTNESS=$(${pkgs.brightnessctl}/bin/brightnessctl --class=leds --device=asus::kbd_backlight get 2>/dev/null || echo "0") && echo "$KBD_BRIGHTNESS" > "$HOME/.cache/niri-kbd-brightness-backup" && ${pkgs.brightnessctl}/bin/brightnessctl --class=leds --device=asus::kbd_backlight set 0' \
         resume '${brightness-save-restore}/bin/brightness-save-restore restore && rm -f /tmp/auto-brightness-disabled && if [ -f "$HOME/.cache/niri-kbd-brightness-backup" ]; then KBD_BRIGHTNESS=$(cat "$HOME/.cache/niri-kbd-brightness-backup"); ${pkgs.brightnessctl}/bin/brightnessctl --class=leds --device=asus::kbd_backlight set "$KBD_BRIGHTNESS" 2>/dev/null || true; rm -f "$HOME/.cache/niri-kbd-brightness-backup"; fi' \
-      timeout 300 '${unstable.quickshell}/bin/qs -p ${noctalia-shell}/share/noctalia-shell ipc call lockScreen lock' \
+      timeout 300 '${unstable.noctalia-qs}/bin/qs -p ${noctalia-shell}/share/noctalia-shell ipc call lockScreen lock' \
       timeout 900 '${brightness-save-restore}/bin/brightness-save-restore save && ${pkgs.systemd}/bin/systemctl suspend' \
-        before-sleep '${unstable.quickshell}/bin/qs -p ${noctalia-shell}/share/noctalia-shell ipc call lockScreen lock'
+        before-sleep '${unstable.noctalia-qs}/bin/qs -p ${noctalia-shell}/share/noctalia-shell ipc call lockScreen lock'
   '';
   
   # Wrapper script for Niri that forces AMD iGPU usage
@@ -451,13 +451,13 @@ let
   # Noctalia Shell - using official package.nix approach
   noctalia-shell = pkgs.stdenvNoCC.mkDerivation rec {
     pname = "noctalia-shell";
-    version = "4.5.0";
-    
+    version = "4.6.7";
+
     src = pkgs.fetchFromGitHub {
       owner = "noctalia-dev";
       repo = "noctalia-shell";
-      rev = "v4.5.0";
-      sha256 = "sha256-Y5P0RYO9NKxa4UZBoGmmxtz3mEwJrBOfvdLJRGjV2Os=";  # v4.5.0 release
+      rev = "v4.6.7";
+      sha256 = "sha256-6fuxf185uga/AaeFgN6VUygGE8bUEkzZSA1UQ1FFes4=";  # v4.6.7 release
     };
     
     nativeBuildInputs = with pkgs; [
@@ -471,7 +471,7 @@ let
     
     # Runtime dependencies (from official package.nix)
     runtimeDeps = with pkgs; [
-      unstable.quickshell  # The qs binary
+      unstable.noctalia-qs  # The qs binary
       brightnessctl
       cava
       cliphist
@@ -493,7 +493,7 @@ let
     installPhase = ''
       mkdir -p $out/share/noctalia-shell $out/bin
       cp -r . $out/share/noctalia-shell
-      ln -s ${unstable.quickshell}/bin/qs $out/bin/noctalia-shell
+      ln -s ${unstable.noctalia-qs}/bin/qs $out/bin/noctalia-shell
     '';
     
     preFixup = ''
@@ -617,7 +617,7 @@ in
     # The session package should take precedence for the desktop entry
     niri
     xwayland-satellite
-    unstable.quickshell
+    unstable.noctalia-qs
     noctalia-shell
     niri-amd-wrapper
     brightness-save-restore
@@ -678,7 +678,7 @@ in
         # Also include the noctalia-shell wrapper's PATH which includes runtimeDeps (gpu-screen-recorder is in runtimeDeps)
         # Note: PassEnvironment will append user session PATH, but system PATH takes precedence
         "PATH=/run/wrappers/bin:${pkgs.lib.makeBinPath (with pkgs; [
-          unstable.quickshell
+          unstable.noctalia-qs
           brightnessctl
           cava
           cliphist
