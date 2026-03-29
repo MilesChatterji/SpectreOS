@@ -451,13 +451,13 @@ let
   # Noctalia Shell - using official package.nix approach
   noctalia-shell = pkgs.stdenvNoCC.mkDerivation rec {
     pname = "noctalia-shell";
-    version = "4.6.7";
+    version = "4.7.1";
 
     src = pkgs.fetchFromGitHub {
       owner = "noctalia-dev";
       repo = "noctalia-shell";
-      rev = "v4.6.7";
-      sha256 = "sha256-6fuxf185uga/AaeFgN6VUygGE8bUEkzZSA1UQ1FFes4=";  # v4.6.7 release
+      rev = "v4.7.1";
+      sha256 = "sha256-h5jMVGjgrfVPufMG3AMj/HGfU/EqU/4WEK7HCKhMN2E=";  # v4.7.1 release
     };
     
     nativeBuildInputs = with pkgs; [

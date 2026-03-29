@@ -11,9 +11,10 @@ let
     libevdev
     xlib
     pyinotify
-    smbus2
+    python-periphery
     pyasyncore
     pywayland
+    xcffib
     xkbcommon
     systemd-python  # Renamed from systemd in NixOS 25.11
   ]);
@@ -21,13 +22,13 @@ let
   # ASUS DialPad Driver package
   asus-dialpad-driver = pkgs.stdenv.mkDerivation rec {
     pname = "asus-dialpad-driver";
-    version = "1.1.0";
+    version = "2.1.1";
     
     src = pkgs.fetchFromGitHub {
       owner = "asus-linux-drivers";
       repo = "asus-dialpad-driver";
       rev = "v${version}";
-      sha256 = "sha256-odaAYB9e/R5UXDzh0XvDrOcO0vq97gNmUIirOWX8RP0=";
+      sha256 = "sha256-+nhcPXzKUIEB8PRdUiT28YwG5aLxIv7k2PnMcf9Vb3o=";
     };
     
     nativeBuildInputs = [
