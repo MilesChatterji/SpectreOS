@@ -22,13 +22,13 @@ let
   # ASUS DialPad Driver package
   asus-dialpad-driver = pkgs.stdenv.mkDerivation rec {
     pname = "asus-dialpad-driver";
-    version = "2.1.1";
-    
+    version = "2.2.0";
+
     src = pkgs.fetchFromGitHub {
       owner = "asus-linux-drivers";
       repo = "asus-dialpad-driver";
       rev = "v${version}";
-      sha256 = "sha256-+nhcPXzKUIEB8PRdUiT28YwG5aLxIv7k2PnMcf9Vb3o=";
+      sha256 = "sha256-AEeC3VRxz70Acj+pQ04NGPTNI7kDCaocrQf6qLqWfF8=";
     };
     
     nativeBuildInputs = [
@@ -42,6 +42,17 @@ let
       pkgs.libxkbcommon
     ];
     
+    # Fix 2.2.0 bugs:
+    # 1. coactivator_keys initializes to None instead of [], causing TypeError
+    #    when Wayland keymap event fires before config loads.
+    # 2. send_key_event checks uinput_device which is never assigned — should
+    #    be udev (the actual libevdev UInput device created in initialize_virtual_device).
+    postPatch = ''
+      substituteInPlace dialpad.py \
+        --replace-fail "coactivator_keys = None" "coactivator_keys = []"
+      sed -i 's/\buinput_device\b/udev/g' dialpad.py
+    '';
+
     buildPhase = ''
       echo "Skipping build phase"
     '';
@@ -112,7 +123,8 @@ in
       # This script checks for WAYLAND_DISPLAY in the session environment and verifies the socket exists
       ExecStartPre = "${pkgs.bash}/bin/bash -c 'while [ -z \"$WAYLAND_DISPLAY\" ] || [ ! -S \"$XDG_RUNTIME_DIR/$WAYLAND_DISPLAY\" ]; do sleep 0.5; done; echo \"Wayland display ready: $WAYLAND_DISPLAY\"'";
       ExecStart = "${asus-dialpad-driver}/bin/asus-dialpad-driver proartp16";
-      WorkingDirectory = "${asus-dialpad-driver}/share/asus-dialpad-driver";
+      WorkingDirectory = "%h/.config/asus-dialpad-driver";
+      ConfigurationDirectory = "asus-dialpad-driver";
       Restart = "on-failure";
       RestartSec = 5;
       StandardOutput = "journal";

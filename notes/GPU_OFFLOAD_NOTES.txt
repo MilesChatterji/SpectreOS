@@ -1,8 +1,54 @@
 GPU Offloading Configuration - Notes and Future Work
 ====================================================
-Date: 2024-11-26 (Updated - RESOLVED)
+Date: 2024-11-26 (Updated - 2026-04-22)
 System: NixOS with Niri Wayland Compositor
 Hardware: AMD Radeon 890M iGPU + NVIDIA RTX 4050 dGPU
+
+KERNEL 7 UPDATE (2026-04-22)
+-----------------------------
+Two issues discovered and resolved after migrating to kernel 7:
+
+1. NVIDIA EGL + VULKAN ICDs HOLDING GPU AWAKE
+   On kernel 7, niri was appearing in nvidia-smi at 2MiB (type G) and the GPU was
+   sitting at P3/~10W instead of suspending. Root cause: libglvnd loads ALL EGL vendors
+   (10_nvidia.json + 50_mesa.json) when niri initializes its GBM/EGL context, causing
+   libnvidia-eglcore.so to load and open /dev/nvidia0 + /dev/nvidiactl. VK_ICD_FILENAMES
+   alone was not enough — EGL (not just Vulkan) was the remaining path.
+
+   Fix: Added BOTH to the niri-session-amd wrapper (export, systemctl set-environment,
+   exec env, and X-KDE-Wayland-Environment desktop entry line):
+   - VK_ICD_FILENAMES=/run/opengl-driver/share/vulkan/icd.d/radeon_icd.x86_64.json
+   - __EGL_VENDOR_LIBRARY_FILENAMES=/run/opengl-driver/share/glvnd/egl_vendor.d/50_mesa.json
+
+   The nvidia-offload wrapper unsets both so NVIDIA-offloaded apps still get full GPU access.
+
+2. POWER MANAGEMENT WAS ONLY COVERING SYSTEM SLEEP, NOT IDLE SUSPEND
+   powerManagement.enable = true only saves/restores GPU state on system suspend/resume.
+   It does NOT allow the GPU to power down while the system is running idle (RTD3).
+
+   hardware.nvidia.powerManagement.finegrained = true would fix this, but it requires
+   hardware.nvidia.prime.offload.enable = true, which needs explicit PCI bus IDs and
+   conflicts with our environment-variable-based offload approach.
+
+   Fix: Manually replicated what finegrained does internally:
+   - boot.extraModprobeConfig: options nvidia NVreg_DynamicPowerManagement=0x02
+   - services.udev.extraRules: sets power/control=auto for all NVIDIA PCI functions
+     (VGA 0x030000, 3D 0x030200, Audio 0x040300, USB 0x0c0330)
+
+   NOTE: RTD3 requires no open handles on the NVIDIA device. The VK_ICD_FILENAMES
+   fix above is what makes this effective — without it, niri would still hold the device
+   open and block suspend.
+
+KERNEL 7 DEVICE MAPPING (confirmed 2026-04-22)
+------------------------------------------------
+On kernel 7 there is no card0 — cards start from card1:
+- /dev/dri/card1: AMD Radeon 890M iGPU (0x1002) — same as before
+- /dev/dri/card2: NVIDIA RTX 4050 dGPU (0x10de) — was card0 on kernel 6.x
+- renderD128: AMD (0x1002) — unchanged
+- renderD129: NVIDIA (0x10de) — unchanged
+
+The dynamic detection script (backlight + vendor ID fallback) correctly identified
+card1 as AMD, so no changes to the detection logic were needed.
 
 CURRENT STATUS - ✅ RESOLVED
 ----------------------------

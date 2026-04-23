@@ -83,12 +83,16 @@ let
     export __NV_PRIME_RENDER_OFFLOAD=1
     export __GLX_VENDOR_LIBRARY_NAME=nvidia
     export __VK_LAYER_NV_optimus=NVIDIA_only
-    
+
     # Legacy DRI_PRIME for older applications
     export DRI_PRIME=1
-    
+
     # Force NVIDIA for Xwayland applications
     export GBM_BACKEND=nvidia-drm
+
+    # Re-enable NVIDIA EGL and Vulkan ICDs (session defaults restrict these to AMD-only)
+    unset __EGL_VENDOR_LIBRARY_FILENAMES
+    unset VK_ICD_FILENAMES
     
     # Execute the command with NVIDIA GPU
     exec "$@"
@@ -166,6 +170,9 @@ in
     
     # Enable power management (allows GPU to power down when not in use)
     powerManagement.enable = true;
+    # Note: powerManagement.finegrained requires hardware.nvidia.prime.offload.enable,
+    # which needs explicit PCI bus IDs. RTD3 is instead enabled manually below via
+    # boot.extraModprobeConfig and services.udev.extraRules.
     
     # Enable support for 32-bit applications (needed for some games/apps)
     nvidiaSettings = true;
@@ -205,5 +212,22 @@ in
   
   # Note: nouveau is automatically blacklisted when proprietary drivers are enabled
   # The NVIDIA GPU will power down when not in use, saving significant power
+
+  # Enable NVIDIA RTD3 (runtime D3) power management manually.
+  # This is what hardware.nvidia.powerManagement.finegrained does internally,
+  # but that option requires hardware.nvidia.prime.offload.enable (and bus IDs).
+  # Since we use environment-variable-based offload instead of NixOS's PRIME module,
+  # we replicate the effect directly here.
+  boot.extraModprobeConfig = ''
+    options nvidia NVreg_DynamicPowerManagement=0x02
+  '';
+
+  services.udev.extraRules = ''
+    # Allow NVIDIA GPU (VGA/3D controller/Audio/USB) to runtime suspend when idle
+    ACTION=="add", SUBSYSTEM=="pci", ATTR{vendor}=="0x10de", ATTR{class}=="0x030000", TEST=="power/control", ATTR{power/control}="auto"
+    ACTION=="add", SUBSYSTEM=="pci", ATTR{vendor}=="0x10de", ATTR{class}=="0x030200", TEST=="power/control", ATTR{power/control}="auto"
+    ACTION=="add", SUBSYSTEM=="pci", ATTR{vendor}=="0x10de", ATTR{class}=="0x040300", TEST=="power/control", ATTR{power/control}="auto"
+    ACTION=="add", SUBSYSTEM=="pci", ATTR{vendor}=="0x10de", ATTR{class}=="0x0c0330", TEST=="power/control", ATTR{power/control}="auto"
+  '';
 }
 

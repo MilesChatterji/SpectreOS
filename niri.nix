@@ -386,9 +386,13 @@ let
     export DRI_PRIME=0
     export __NV_PRIME_RENDER_OFFLOAD=0
     export __VK_LAYER_NV_optimus=
-    # Don't restrict VK_ICD_FILENAMES - let Vulkan auto-detect drivers
-    # The other environment variables (DRI_PRIME, __GLX_VENDOR_LIBRARY_NAME) will guide GPU selection
-    # This allows applications to find the right drivers while preferring AMD
+    # Restrict Vulkan to AMD ICD only - prevents NVIDIA Vulkan ICD from initializing,
+    # which would otherwise hold a graphics context open and block NVIDIA runtime suspend
+    export VK_ICD_FILENAMES=/run/opengl-driver/share/vulkan/icd.d/radeon_icd.x86_64.json
+    # Restrict EGL to Mesa only - prevents NVIDIA EGL (libnvidia-eglcore) from loading,
+    # which libglvnd would otherwise initialize via 10_nvidia.json when niri sets up its
+    # GBM/EGL context, holding /dev/nvidia0 open and blocking NVIDIA runtime suspend
+    export __EGL_VENDOR_LIBRARY_FILENAMES=/run/opengl-driver/share/glvnd/egl_vendor.d/50_mesa.json
     
     # Force Xwayland to use AMD iGPU
     # Xwayland is launched by Niri and should inherit WLR_DRM_DEVICES
@@ -420,7 +424,9 @@ let
     # Force Xwayland to use AMD iGPU
     systemctl --user set-environment GBM_BACKEND=/dev/dri/$AMD_RENDER
     systemctl --user set-environment MESA_LOADER_DRIVER_OVERRIDE=radeonsi
-    
+    systemctl --user set-environment VK_ICD_FILENAMES=/run/opengl-driver/share/vulkan/icd.d/radeon_icd.x86_64.json
+    systemctl --user set-environment __EGL_VENDOR_LIBRARY_FILENAMES=/run/opengl-driver/share/glvnd/egl_vendor.d/50_mesa.json
+
     # Launch niri-session with AMD iGPU
     # The environment variables should force Niri and Xwayland to use AMD only
     # NVIDIA GPU should power down automatically when not in use
@@ -431,6 +437,8 @@ let
             __NV_PRIME_RENDER_OFFLOAD=0 \
             GBM_BACKEND=/dev/dri/$AMD_RENDER \
             MESA_LOADER_DRIVER_OVERRIDE=radeonsi \
+            VK_ICD_FILENAMES=/run/opengl-driver/share/vulkan/icd.d/radeon_icd.x86_64.json \
+            __EGL_VENDOR_LIBRARY_FILENAMES=/run/opengl-driver/share/glvnd/egl_vendor.d/50_mesa.json \
             ${pkgs.niri}/bin/niri-session "$@"
   '';
   
@@ -445,19 +453,19 @@ let
     Exec=${niri-amd-wrapper}/bin/niri-session-amd
     Type=Application
     DesktopNames=niri
-    X-KDE-Wayland-Environment=WLR_DRM_NO_MODIFIERS=1;__GLX_VENDOR_LIBRARY_NAME=mesa;DRI_PRIME=0;__NV_PRIME_RENDER_OFFLOAD=0;__VK_LAYER_NV_optimus=;MESA_LOADER_DRIVER_OVERRIDE=radeonsi
+    X-KDE-Wayland-Environment=WLR_DRM_NO_MODIFIERS=1;__GLX_VENDOR_LIBRARY_NAME=mesa;DRI_PRIME=0;__NV_PRIME_RENDER_OFFLOAD=0;__VK_LAYER_NV_optimus=;MESA_LOADER_DRIVER_OVERRIDE=radeonsi;VK_ICD_FILENAMES=/run/opengl-driver/share/vulkan/icd.d/radeon_icd.x86_64.json;__EGL_VENDOR_LIBRARY_FILENAMES=/run/opengl-driver/share/glvnd/egl_vendor.d/50_mesa.json
   '';
   
   # Noctalia Shell - using official package.nix approach
   noctalia-shell = pkgs.stdenvNoCC.mkDerivation rec {
     pname = "noctalia-shell";
-    version = "4.7.1";
+    version = "4.7.5";
 
     src = pkgs.fetchFromGitHub {
       owner = "noctalia-dev";
       repo = "noctalia-shell";
-      rev = "v4.7.1";
-      sha256 = "sha256-h5jMVGjgrfVPufMG3AMj/HGfU/EqU/4WEK7HCKhMN2E=";  # v4.7.1 release
+      rev = "v4.7.5";
+      sha256 = "sha256-0xoCuJSRSWcn4mCX382lCxqLbnuOrrqS4dOcdpoUmZg=";  # v4.7.5 release
     };
     
     nativeBuildInputs = with pkgs; [

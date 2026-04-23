@@ -200,8 +200,8 @@ in
     themePackages = [ spectreos-plymouth-theme ];
   };
 
-  # Pin to kernel 6.19; default on 25.11 is 6.12. NVIDIA 580.126.18 from unstable in gpu-offload.nix.
-  boot.kernelPackages = pkgs.linuxPackages_6_19;
+  # Kernel 7; default on 25.11 is 6.12. NVIDIA 580.126.18 from unstable in gpu-offload.nix.
+  boot.kernelPackages = pkgs.linuxKernel.packages.linux_7_0;
 
   # Kernel parameters for DisplayPort Multi-Stream Transport (DP-MST) support
   # Note: MST debugging removed - was causing excessive logging and performance issues
