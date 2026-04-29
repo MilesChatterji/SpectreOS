@@ -88,11 +88,13 @@ ENVIRONMENT VARIABLES SET
 - GBM_BACKEND=/dev/dri/renderD128 ✅ Working - Forces Xwayland to use AMD
 - MESA_LOADER_DRIVER_OVERRIDE=radeonsi
 
-GPU DEVICE MAPPING (CORRECTED)
--------------------------------
+GPU DEVICE MAPPING (CORRECTED - KERNEL 6.x ONLY)
+-------------------------------------------------
+⚠️ NOTE: This mapping is for kernel 6.x. On kernel 7, card numbering starts at card1
+         (no card0). See "KERNEL 7 DEVICE MAPPING" section above for current mapping.
 ⚠️ IMPORTANT: The initial mapping was incorrect!
-- /dev/dri/card0: NVIDIA RTX 4050 (renderD129) ⚠️ renderD129 is NVIDIA
-- /dev/dri/card1: AMD Radeon 890M iGPU (renderD128) ⚠️ renderD128 is AMD
+- /dev/dri/card0: NVIDIA RTX 4050 (renderD129) ⚠️ renderD129 is NVIDIA  [KERNEL 6.x]
+- /dev/dri/card1: AMD Radeon 890M iGPU (renderD128) ⚠️ renderD128 is AMD  [KERNEL 6.x]
 
 The key fix was correcting the render device mapping:
 - renderD128 = AMD iGPU (correct device for compositor)
@@ -175,9 +177,10 @@ Hardware Model:
 - NVIDIA RTX 4050 dGPU (discrete)
 
 Device Paths (HARDWARE-SPECIFIC):
-- /dev/dri/card0: NVIDIA RTX 4050 (renderD129)  ⚠️ May differ on other systems
-- /dev/dri/card1: AMD Radeon 890M iGPU (renderD128)  ⚠️ May differ on other systems
+- /dev/dri/card1: AMD Radeon 890M iGPU (renderD128)  [kernel 7+; was card1 on kernel 6.x too]
+- /dev/dri/card2: NVIDIA RTX 4050 (renderD129)  [kernel 7+; was card0 on kernel 6.x]
 - ⚠️ CRITICAL: renderD128 = AMD, renderD129 = NVIDIA (was initially reversed!)
+- ⚠️ NOTE: card0 no longer exists on kernel 7 — cards start from card1
 
 Environment Variable Values (HARDWARE-SPECIFIC):
 - WLR_DRM_DEVICES=/dev/dri/card1  ⚠️ Must detect which card is iGPU

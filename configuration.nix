@@ -393,6 +393,29 @@ in
   # this value at the release version of the first install of this system.
   # Before changing this value read the documentation for this option
   # (e.g. man configuration.nix or on https://nixos.org/nixos/options.html).
+  # SpectreOS identity — overrides NixOS defaults in /etc/os-release and /etc/lsb-release.
+  # ID_LIKE=nixos preserves NixOS tooling compatibility. lib.mkForce is required because
+  # NixOS sets these files with high priority.
+  environment.etc."os-release".text = lib.mkForce ''
+    NAME="SpectreOS"
+    PRETTY_NAME="SpectreOS 0.1 (Beta)"
+    ID=spectreos
+    ID_LIKE=nixos
+    VERSION="0.1"
+    VERSION_ID="0.1"
+    VERSION_CODENAME=beta
+    LOGO="nix-snowflake"
+    ANSI_COLOR="0;38;2;126;186;228"
+  '';
+
+  environment.etc."lsb-release".text = lib.mkForce ''
+    DISTRIB_ID=SpectreOS
+    DISTRIB_RELEASE=0.1
+    DISTRIB_CODENAME=beta
+    DISTRIB_DESCRIPTION="SpectreOS 0.1 (Beta)"
+    LSB_VERSION=0.1
+  '';
+
   system.stateVersion = "25.11"; # Did you read the comment?
 
 }

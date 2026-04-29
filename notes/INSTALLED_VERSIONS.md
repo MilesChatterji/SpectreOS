@@ -32,19 +32,9 @@ This document tracks the versions of key packages installed on your system.
 ## **Noctalia Shell**
 
 ### Version Information
-- **Actual Installed Version**: **3.3.0** (as reported by Noctalia Shell)
-- **Latest Available Version**: **3.5.0** (released 2025-12-01)
-- **Declared Version in Nix**: **0.1.0** (arbitrary metadata, not related to actual version)
-- **Source**: Custom derivation fetching from GitHub
-- **Git Branch**: `main` (pinned)
-- **SHA256**: `sha256-pWz6IWgG614EoVxPY6tlEsurZMznBvbyliI3go1BAuY=`
-- **Location in config**: `niri.nix` lines 299-358
-
-### Version Correlation
-- The **"0.1.0"** in `niri.nix` is just Nix derivation metadata and has no relation to the actual Noctalia Shell version
-- The **actual version (3.3.0)** is determined by the commit on the `main` branch that the SHA256 corresponds to
-- Noctalia Shell uses semantic versioning: **3.3.0 → 3.4.0 → 3.5.0**
-- Your SHA256 likely corresponds to the v3.3.0 release commit
+- **Installed Version**: **4.7.1**
+- **Source**: Custom derivation fetching from GitHub, pinned to specific rev
+- **Location in config**: `niri.nix`
 
 ### Configuration Details
 ```nix
@@ -62,27 +52,9 @@ noctalia-shell = pkgs.stdenvNoCC.mkDerivation rec {
 }
 ```
 
-### Current GitHub State
-- **Latest release**: **v3.5.0** (published 2025-12-01)
-- **Your installed version**: **v3.3.0** (published 2025-11-23)
-- **Latest main branch commit**: `ba09514138f964bc680f95ec7c80263442f56b2d`
-- **Latest commit date**: 2025-12-01T21:12:49Z
-- **Note**: The SHA256 in your config corresponds to a commit from around v3.3.0 timeframe
-
 ### Upgrade Notes
-- ⚠️ **Pinned to `main` branch** - won't auto-update
-- ⚠️ **SHA256 pinning** - if `main` branch moves, SHA256 will break and need updating
-- ⚠️ **Version Mismatch**: You're running **3.3.0** but **3.5.0** is available
-- **To check if update needed**:
-  ```bash
-  nix-prefetch-github noctalia-dev noctalia-shell --rev main
-  # Or pin to specific release:
-  nix-prefetch-github noctalia-dev noctalia-shell --rev v3.5.0
-  ```
-- **To update to v3.5.0**: 
-  1. Update `rev` in `niri.nix` line 306 to `"v3.5.0"` (or keep `"main"` for latest)
-  2. Update SHA256 in `niri.nix` line 307 with new hash from `nix-prefetch-github`
-- **Recommendation**: Consider pinning to a specific release tag (e.g., `v3.5.0`) instead of `main` for stability and predictable versions
+- ⚠️ Pinned to specific rev with SHA256 — won't auto-update
+- To upgrade: update `rev` and SHA256 in `niri.nix` to the desired release tag
 
 ### Dependencies
 - **Quickshell**: 0.2.1 (from unstable channel)
@@ -113,9 +85,11 @@ noctalia-shell = pkgs.stdenvNoCC.mkDerivation rec {
 
 | Package | Version | Source | Auto-Update | Notes |
 |---------|---------|--------|-------------|-------|
+| **Linux Kernel** | 7.0 | `pkgs.linuxKernel.packages.linux_7_0` | ❌ No | Pinned. Migrated from 6.19 (EOL at 6.19.14) on 2026-04-22 |
 | **Niri** | 25.08 | `pkgs.niri` | ✅ Yes | Updates with nixpkgs channel |
-| **Noctalia Shell** | **3.3.0** (actual) / 0.1.0 (Nix metadata) | GitHub `main` branch | ❌ No | Pinned to `main` with SHA256. **3.5.0 available** |
+| **Noctalia Shell** | **4.7.1** | GitHub rev pinned | ❌ No | Pinned to specific rev with SHA256 |
 | **Quickshell** | 0.2.1 | `unstable.quickshell` | ✅ Yes | Updates with unstable channel |
+| **ASUS DialPad Driver** | 2.2.0 | GitHub `fetchFromGitHub` | ❌ No | Patched via postPatch for two 2.2.0 bugs — see ASUS_DIALPAD_FIX.md |
 
 ---
 
@@ -159,6 +133,6 @@ nix-store -q --references $(which niri) | head -10
 
 ---
 
-**Last Updated**: $(date +%Y-%m-%d)
-**Next Review**: Before NixOS 25.11 upgrade
+**Last Updated**: 2026-04-22
+**Next Review**: Before next NixOS upgrade
 

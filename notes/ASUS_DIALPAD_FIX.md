@@ -131,3 +131,33 @@ systemctl --user show asus-dialpad-driver | grep NRestarts
 
 The fix has been tested and verified. The service should start automatically when logging into a graphical session.
 
+---
+
+## Driver Version 2.2.0 Bug Fixes (2026-04-22)
+
+Two additional bugs were found in asus-dialpad-driver 2.2.0 and patched via `postPatch` in `asus-dialpad.nix`.
+
+### Bug 1: `coactivator_keys = None` causes TypeError on startup
+
+`coactivator_keys` is initialized to `None` at module level. The Wayland keymap event fires early (before `load_all_config_values()` runs), triggering `wl_keyboard_keymap_handler` → `wl_load_keymap_state()` → `load_evdev_keys_for_coactivator_modifiers(None)`, which tries to iterate over `None`.
+
+**Fix:**
+```bash
+substituteInPlace dialpad.py \
+  --replace-fail "coactivator_keys = None" "coactivator_keys = []"
+```
+
+### Bug 2: `send_key_event` checks `uinput_device` which is never assigned
+
+`initialize_virtual_device()` correctly creates `udev = dev.create_uinput_device()`, but `send_key_event` checks `uinput_device` (always `None`), causing every key event to log "Virtual device is not initialized" and return early. This is a 2.2.0 rename regression — the variable was renamed in half the code.
+
+**Fix:**
+```bash
+# \b word boundaries prevent replacing create_uinput_device method name
+sed -i 's/\buinput_device\b/udev/g' dialpad.py
+```
+
+### Config file note
+
+`top_right_icon_coactivator_key` should be left empty (the default). Empty means no modifier key is required to toggle the dialpad via the top-right corner. Setting it to e.g. `KEY_LEFTSHIFT` would require holding Shift while touching to activate.
+
