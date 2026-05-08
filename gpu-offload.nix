@@ -3,45 +3,25 @@
 # This reduces power consumption significantly
 # System: AMD Ryzen AI 9 HX 370 with Radeon 890M (card1/amdgpu) + NVIDIA discrete (card0/nvidia)
 #
-# NOTE (2025-02-07): NVIDIA driver is pulled from nixos-unstable (580.126.18+) so it builds
-# on kernel 6.19.x. Stable channel (e.g. 25.11) still had 580.119.02 which does not build on 6.19.
-# Only this package comes from unstable; rest of system stays on your channel.
-# TODO: When your NixOS channel has nvidia 580.126.18+ in stable, revert to:
-#   package = config.boot.kernelPackages.nvidiaPackages.production;
-# and remove the unstable fetch/import and unstableNvidiaPackages in the let block below.
+# NOTE: NVIDIA driver pulled from nixos-unstable for 595.x, which has materially better
+# RTD3 power management than the 580.142 in stable 25.11. Only this package comes from
+# unstable; rest of system stays on 25.11. Revisit when stable catches up to 595.x.
 
 { config, pkgs, ... }:
 
 let
-  # Import nixpkgs-unstable only for the NVIDIA driver (580.126.18+).
-  # The driver is built against your current kernel (config.boot.kernelPackages)
-  # so the rest of the system stays on your channel (e.g. 25.11).
-  unstableSrc = builtins.fetchTarball {
+  # Import nixpkgs-unstable only for the NVIDIA driver (595.x).
+  # Using unstable.linuxKernel.packages.linux_7_0.nvidiaPackages gives the full, correctly
+  # wired package — userspace libs AND kernel modules built against linux_7_0. This is safe
+  # because stable 25.11 and unstable both use the same linux_7_0 source hash, so modules
+  # built from the unstable package set load without issue on the system's running kernel.
+  unstable = import (builtins.fetchTarball {
     url = "https://github.com/NixOS/nixpkgs/archive/nixos-unstable.tar.gz";
-    # Omit sha256 to track latest unstable; add sha256 to pin to a specific tarball.
-  };
-  unstable = import unstableSrc {
+  }) {
     config.allowUnfree = true;
     inherit (config.nixpkgs) system;
   };
-  # nvidia-x11 gets kernel from the package set via internal callPackage. The top-level
-  # unstable set has no "kernel"; we override callPackage so every call injects our kernel.
-  ourKernel = config.boot.kernelPackages.kernel;
-  # Inject kernel when the called function has a 'kernel' argument.
-  # Only pass our callPackage when calling the top-level nvidia-x11 default.nix, so inner
-  # callPackage (e.g. settings.nix) are not given unexpected 'callPackage'.
-  nvidiaX11Path = unstableSrc + "/pkgs/os-specific/linux/nvidia-x11";
-  unstableWithOurKernel = unstable // {
-    kernel = ourKernel;
-    callPackage = fn: args:
-      let
-        inject = if builtins.isFunction fn && builtins.functionArgs fn ? kernel then { kernel = ourKernel; } else { };
-        passOurCallPackage = if fn == nvidiaX11Path then { callPackage = unstableWithOurKernel.callPackage; } else { };
-        args' = args // inject // passOurCallPackage;
-      in
-      unstable.callPackage fn args';
-  };
-  unstableNvidiaPackages = unstableWithOurKernel.callPackage (unstableSrc + "/pkgs/os-specific/linux/nvidia-x11") { };
+  unstableNvidiaPackages = unstable.linuxKernel.packages.linux_7_0.nvidiaPackages;
 
   # NVIDIA offload wrapper script
   # Use this to run applications on the NVIDIA GPU instead of AMD iGPU
@@ -68,16 +48,17 @@ let
     # This is needed for FHS environments (like DaVinci Resolve) that may not have
     # the plugin in their default library search path
     export ALSA_PLUGIN_DIR="${pkgs.alsa-plugins}/lib/alsa-lib"
-    # Ensure ALSA library can find the PulseAudio plugin
-    # Add alsa-plugins to library path so the plugin is accessible from FHS environment
-    # Prepend to preserve any existing library paths (important for FHS environments)
+    # Expose NVIDIA userspace libs (libnvidia-ml, libcuda, libEGL_nvidia, etc.)
+    # to processes inside the FHS container. The FHS rootfs has no NVIDIA libs bundled,
+    # and /run/opengl-driver/lib is not in its ld.so.conf, so GPUDetect cannot load
+    # libnvidia-ml.so on Wayland (no X11 logs fallback) without this path.
+    # Safe to prepend: /run/opengl-driver/lib has only NVIDIA-specific libs, not the
+    # generic libGL.so.1/libEGL.so.1 dispatch stubs that the FHS provides via glvnd.
     if [ -z "$LD_LIBRARY_PATH" ]; then
-      export LD_LIBRARY_PATH="${pkgs.alsa-plugins}/lib"
+      export LD_LIBRARY_PATH="/run/opengl-driver/lib:${pkgs.alsa-plugins}/lib"
     else
-      export LD_LIBRARY_PATH="${pkgs.alsa-plugins}/lib:$LD_LIBRARY_PATH"
+      export LD_LIBRARY_PATH="/run/opengl-driver/lib:${pkgs.alsa-plugins}/lib:$LD_LIBRARY_PATH"
     fi
-    # Note: The FHS environment should have its own library paths set up
-    # We're only adding the alsa-plugins path, not replacing the entire LD_LIBRARY_PATH
     
     # NVIDIA PRIME render offload (for modern applications)
     export __NV_PRIME_RENDER_OFFLOAD=1
@@ -90,9 +71,13 @@ let
     # Force NVIDIA for Xwayland applications
     export GBM_BACKEND=nvidia-drm
 
-    # Re-enable NVIDIA EGL and Vulkan ICDs (session defaults restrict these to AMD-only)
-    unset __EGL_VENDOR_LIBRARY_FILENAMES
-    unset VK_ICD_FILENAMES
+    # Re-enable NVIDIA EGL and Vulkan ICDs.
+    # niri.nix pins these to AMD-only so the NVIDIA GPU can RTD3 power-down when idle.
+    # Unsetting is not enough: GLVND falls back to XDG_DATA_DIRS scanning, and
+    # /run/opengl-driver/share is not in XDG_DATA_DIRS, so the NVIDIA ICD is never found.
+    # Must explicitly point to the NVIDIA ICD paths inside /run/opengl-driver.
+    export __EGL_VENDOR_LIBRARY_FILENAMES="/run/opengl-driver/share/glvnd/egl_vendor.d/10_nvidia.json"
+    export VK_ICD_FILENAMES="/run/opengl-driver/share/vulkan/icd.d/nvidia_icd.json"
     
     # Execute the command with NVIDIA GPU
     exec "$@"
@@ -177,10 +162,15 @@ in
     # Enable support for 32-bit applications (needed for some games/apps)
     nvidiaSettings = true;
     
-    # Use production driver from nixpkgs-unstable (580.126.18+) built for current kernel.
-    # See NOTE at top of file (2025-02-07): revert to .nvidiaPackages.production when stable has it.
+    # 595.x production driver from nixos-unstable — better RTD3 than stable 25.11's 580.x.
     package = unstableNvidiaPackages.production;
   };
+
+  # nixpkgs-unstable restructured the NVIDIA driver: kernel modules are now a separate
+  # .mod output (nvidia-kernel-modules-<ver>-<kernel>), not included in the main package.
+  # Stable 25.11's hardware.nvidia module only adds cfg.package to extraModulePackages,
+  # which is the userspace-only derivation. Adding .mod explicitly provides the .ko files.
+  boot.extraModulePackages = [ unstableNvidiaPackages.production.mod ];
   
   # Set environment variables for PRIME offloading
   # Use AMD 890M iGPU by default, NVIDIA via nvidia-offload wrapper

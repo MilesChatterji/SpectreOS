@@ -236,6 +236,12 @@ in
   #enable flatpak for 3rd party software containers
   services.flatpak.enable = true;
 
+  # Virtualisation (KVM/QEMU)
+  virtualisation.libvirtd = {
+    enable = true;
+    qemu.package = pkgs.qemu_kvm;
+  };
+
   networking.hostName = "PX13"; # Define your hostname.
   # networking.wireless.enable = true;  # Enables wireless support via wpa_supplicant.
 
@@ -311,7 +317,7 @@ in
     description = "Miles Chatterji";
     # All groups: networkmanager (networking), wheel (sudo), video/render (GPU access), 
     # uinput/input/i2c (ASUS DialPad hardware access)
-    extraGroups = [ "networkmanager" "wheel" "video" "render" "uinput" "input" "i2c" ];
+    extraGroups = [ "networkmanager" "wheel" "video" "render" "uinput" "input" "i2c" "libvirtd" ];
     packages = with pkgs; [
     #  thunderbird
     ];
@@ -396,6 +402,49 @@ in
   # SpectreOS identity — overrides NixOS defaults in /etc/os-release and /etc/lsb-release.
   # ID_LIKE=nixos preserves NixOS tooling compatibility. lib.mkForce is required because
   # NixOS sets these files with high priority.
+  environment.etc."spectreos/upgrade-helper.sh" = {
+    text = ''
+      #!/usr/bin/env bash
+      set -euo pipefail
+      VERSION="''${1:?Usage: upgrade-helper.sh <version>}"
+      export PATH="/run/current-system/sw/bin:/nix/var/nix/profiles/default/bin:$PATH"
+      nix-channel --add "https://nixos.org/channels/nixos-$VERSION" nixos
+      nix-channel --add "https://github.com/nix-community/home-manager/archive/release-$VERSION.tar.gz" home-manager
+      nix-channel --update
+      nixos-rebuild switch --upgrade
+    '';
+    mode = "0755";
+  };
+
+  environment.etc."spectreos/rebuild-helper.sh" = {
+    text = ''
+      #!/usr/bin/env bash
+      set -euo pipefail
+      export PATH="/run/current-system/sw/bin:/nix/var/nix/profiles/default/bin:$PATH"
+      nixos-rebuild switch
+    '';
+    mode = "0755";
+  };
+
+  environment.etc."spectreos/rollback-helper.sh" = {
+    text = ''
+      #!/usr/bin/env bash
+      set -euo pipefail
+      GENERATION="''${1:?Usage: rollback-helper.sh <generation>}"
+      export PATH="/run/current-system/sw/bin:/nix/var/nix/profiles/default/bin:$PATH"
+      nix-env --switch-generation "$GENERATION" --profile /nix/var/nix/profiles/system
+      /nix/var/nix/profiles/system/bin/switch-to-configuration switch
+    '';
+    mode = "0755";
+  };
+
+  # Allow wheel-group users to run the SpectreOS helper scripts without a password prompt.
+  security.sudo.extraConfig = ''
+    %wheel ALL=(root) NOPASSWD: /etc/spectreos/upgrade-helper.sh *
+    %wheel ALL=(root) NOPASSWD: /etc/spectreos/rebuild-helper.sh
+    %wheel ALL=(root) NOPASSWD: /etc/spectreos/rollback-helper.sh *
+  '';
+
   environment.etc."os-release".text = lib.mkForce ''
     NAME="SpectreOS"
     PRETTY_NAME="SpectreOS 0.1 (Beta)"
