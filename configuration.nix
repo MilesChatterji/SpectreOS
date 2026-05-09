@@ -337,12 +337,31 @@ in
   # nix-command: Enables the new nix command (nix search, nix shell, etc.)
   nix.settings.experimental-features = [ "nix-command" "flakes" ];
 
+  # Added 2026-05-08 for SpectreOS Updater compatibility.
+  # home-manager does NOT set its own NIX_PATH entry — it relies on <home-manager/...>
+  # being resolvable at evaluation time. Without this, 'home-manager switch' fails after
+  # a nixos-rebuild because the channel path is no longer guaranteed to exist.
+  # Pointing at pkgs.home-manager.src keeps the pinned version in lock-step with the binary.
+  nix.nixPath = [
+    "home-manager=${pkgs.home-manager.src}"
+    "nixpkgs=/nix/var/nix/profiles/per-user/root/channels/nixos"
+    "nixos-config=/etc/nixos/configuration.nix"
+    "/nix/var/nix/profiles/per-user/root/channels"
+  ];
+
   # List packages installed in system profile. To search, run:
   # $ nix search wget
   # Most user packages have been migrated to Home Manager
   # Keep these at system level for TTY/recovery access and multi-user availability
   environment.systemPackages = with pkgs; [
   #  vim # Do not forget to add an editor to edit configuration.nix! The Nano editor is also installed by default.
+
+  # SpectreOS Updater — GTK4/Rust GUI for package management and system updates.
+  # Added 2026-05-08. Source lives in SpectreOS26.05 (the portable project base);
+  # absolute path is intentional — the host config has no apps/ subdirectory.
+  # package.nix uses ./ relative to itself, so the absolute callPackage path is safe.
+  (pkgs.callPackage /home/miles/Documents/SpectreOS26.05/apps/spectreos-updater/package.nix {})
+
   neovim  # Keep for TTY/recovery editing
   git     # Keep for version control in TTY/recovery
   wget    # Keep for downloads in TTY/recovery
@@ -351,6 +370,11 @@ in
   lshw    # Hardware info (system-level)
   colord  # Color management daemon (for ICC profile management)
   nvtopPackages.full
+
+  # Added 2026-05-08 — required by the SpectreOS Updater's System tab.
+  # home-manager is invoked as 'bash -l -c home-manager switch' by the updater;
+  # it must be on PATH at the system level so it's available before a user session starts.
+  home-manager
   ];
 
   # Autostart systemd systemctl configs for apps that should open with other apps. 
