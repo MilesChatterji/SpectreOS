@@ -462,11 +462,22 @@ in
     mode = "0755";
   };
 
+  environment.etc."spectreos/list-generations-helper.sh" = {
+    text = ''
+      #!/usr/bin/env bash
+      set -euo pipefail
+      export PATH="/run/current-system/sw/bin:/nix/var/nix/profiles/default/bin:$PATH"
+      nix-env --list-generations --profile /nix/var/nix/profiles/system
+    '';
+    mode = "0755";
+  };
+
   # Allow wheel-group users to run the SpectreOS helper scripts without a password prompt.
   security.sudo.extraConfig = ''
     %wheel ALL=(root) NOPASSWD: /etc/spectreos/upgrade-helper.sh *
     %wheel ALL=(root) NOPASSWD: /etc/spectreos/rebuild-helper.sh
     %wheel ALL=(root) NOPASSWD: /etc/spectreos/rollback-helper.sh *
+    %wheel ALL=(root) NOPASSWD: /etc/spectreos/list-generations-helper.sh
   '';
 
   environment.etc."os-release".text = lib.mkForce ''
