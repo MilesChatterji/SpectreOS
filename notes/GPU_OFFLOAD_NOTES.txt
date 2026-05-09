@@ -4,6 +4,27 @@ Date: 2024-11-26 (Updated - 2026-04-22)
 System: NixOS with Niri Wayland Compositor
 Hardware: AMD Radeon 890M iGPU + NVIDIA RTX 4050 dGPU
 
+SUPERGFXD & ZSH ALIASES UPDATE (2026-05-08)
+-------------------------------------------
+supergfxd Integrated mode confirmed fully working after logout/login cycle.
+
+NVML / nvidia-smi behavior in Integrated mode:
+- "Failed to initialize NVML: No supported GPUs were found" is EXPECTED
+- GPU is completely powered off via ASUS WMI — not a driver error
+
+iGPU capability assessment:
+- AMD Radeon 890M is capable of light DaVinci Resolve editing:
+  timeline editing, color grading, moderate effects
+- NVIDIA Hybrid mode reserved for: tracking, masking, noise reduction, large exports
+- Workflow: keep heavy editing on desktop; laptop for lighter mobile work
+
+ZSH aliases added to ~/.zshrc (grouped under #gpu tasks):
+  gpu-integrated  → sudo supergfxctl --mode Integrated + logout reminder
+  gpu-hybrid      → sudo supergfxctl --mode Hybrid + logout reminder
+  gpu-mode        → supergfxctl --get (read-only check)
+
+Battery life in Integrated mode: 14+ hours reported — viable for all-day mobile use.
+
 KERNEL 7 UPDATE (2026-04-22)
 -----------------------------
 Two issues discovered and resolved after migrating to kernel 7:

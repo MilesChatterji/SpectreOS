@@ -3,9 +3,16 @@
 # This reduces power consumption significantly
 # System: AMD Ryzen AI 9 HX 370 with Radeon 890M (card1/amdgpu) + NVIDIA discrete (card0/nvidia)
 #
-# NOTE: NVIDIA driver pulled from nixos-unstable for 595.x, which has materially better
-# RTD3 power management than the 580.142 in stable 25.11. Only this package comes from
-# unstable; rest of system stays on 25.11. Revisit when stable catches up to 595.x.
+# NOTE: NVIDIA driver pulled from nixos-unstable for 595.x. The stable 25.11 channel has
+# 580.142 which has lower idle power but we stay on unstable to track 595.x improvements.
+# The .mod split (boot.extraModulePackages) is an unstable restructuring that stable will
+# likely adopt — keeping it now avoids a future surprise when stable catches up.
+# When upgrading, update the version note in the fetchTarball comment below.
+#
+# ASUS PX13 HARDWARE NOTE — OS-BUILDER: This file is specific to the ASUS ProArt PX13
+# (AMD Ryzen AI 9 HX 370 + NVIDIA dGPU). Do NOT include supergfxd or this GPU offload
+# configuration in the SpectreOS base image or VM images. It should be an optional
+# hardware profile applied only on supported ASUS hybrid-GPU laptops.
 
 { config, pkgs, ... }:
 
@@ -16,6 +23,9 @@ let
   # because stable 25.11 and unstable both use the same linux_7_0 source hash, so modules
   # built from the unstable package set load without issue on the system's running kernel.
   unstable = import (builtins.fetchTarball {
+    # Tracking nixos-unstable. No sha256 pin — intentionally unpinned to pick up
+    # driver improvements automatically. Current as of 2026-05-08: NVIDIA 595.71.05.
+    # When upgrading, note the new version and date here so version history is preserved.
     url = "https://github.com/NixOS/nixpkgs/archive/nixos-unstable.tar.gz";
   }) {
     config.allowUnfree = true;
@@ -219,5 +229,34 @@ in
     ACTION=="add", SUBSYSTEM=="pci", ATTR{vendor}=="0x10de", ATTR{class}=="0x040300", TEST=="power/control", ATTR{power/control}="auto"
     ACTION=="add", SUBSYSTEM=="pci", ATTR{vendor}=="0x10de", ATTR{class}=="0x0c0330", TEST=="power/control", ATTR{power/control}="auto"
   '';
+
+  # ASUS GPU switching daemon — powers the dGPU completely off when not needed.
+  # This platform's firmware does not support NVIDIA RTD3 (D3cold), so the GPU
+  # sits at ~6W in P8 idle when NVIDIA modules are loaded regardless of driver config.
+  # supergfxd in Integrated mode bypasses RTD3 entirely via ASUS WMI, reaching ~0W.
+  #
+  # Default mode: Integrated (dGPU off, best battery life).
+  # To use NVIDIA GPU (e.g. DaVinci Resolve):
+  #   supergfxctl -m Hybrid   → logout/login → nvidia-offload <app>
+  # To return to battery-optimised state:
+  #   supergfxctl -m Integrated → logout/login
+  #
+  # NOTE: Switching modes requires logout. This config resets to Integrated on nixos-rebuild,
+  # so edit mode to "Hybrid" here if you want that to persist across rebuilds.
+  #
+  # OS-BUILDER: supergfxd is ASUS-specific. Exclude from base and VM images.
+  services.supergfxd = {
+    enable = true;
+    settings = {
+      mode = "Integrated";
+      vfio_enable = false;
+      vfio_save = false;
+      compute_save = false;
+      always_reboot = false;
+      no_logind = false;
+      logout_timeout_s = 180;
+      hotplug_type = "None";
+    };
+  };
 }
 
