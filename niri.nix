@@ -1,6 +1,4 @@
 # Niri Wayland Compositor configuration with Noctalia Shell
-# Based on official noctalia-shell package.nix approach
-# https://github.com/noctalia-dev/noctalia-shell/tree/main/nix
 
 { config, pkgs, ... }:
 
@@ -288,9 +286,9 @@ let
     ${pkgs.swayidle}/bin/swayidle -w \
       timeout 180 '${brightness-save-restore}/bin/brightness-save-restore save && touch /tmp/auto-brightness-disabled && ${pkgs.brightnessctl}/bin/brightnessctl --class=backlight set 10% && KBD_BRIGHTNESS=$(${pkgs.brightnessctl}/bin/brightnessctl --class=leds --device=asus::kbd_backlight get 2>/dev/null || echo "0") && echo "$KBD_BRIGHTNESS" > "$HOME/.cache/niri-kbd-brightness-backup" && ${pkgs.brightnessctl}/bin/brightnessctl --class=leds --device=asus::kbd_backlight set 0' \
         resume '${brightness-save-restore}/bin/brightness-save-restore restore && rm -f /tmp/auto-brightness-disabled && if [ -f "$HOME/.cache/niri-kbd-brightness-backup" ]; then KBD_BRIGHTNESS=$(cat "$HOME/.cache/niri-kbd-brightness-backup"); ${pkgs.brightnessctl}/bin/brightnessctl --class=leds --device=asus::kbd_backlight set "$KBD_BRIGHTNESS" 2>/dev/null || true; rm -f "$HOME/.cache/niri-kbd-brightness-backup"; fi' \
-      timeout 300 '${unstable.noctalia-qs}/bin/qs -p ${noctalia-shell}/share/noctalia-shell ipc call lockScreen lock' \
+      timeout 300 '${unstable.noctalia-qs}/bin/qs -p ${unstable.noctalia-shell}/share/noctalia-shell ipc call lockScreen lock' \
       timeout 900 '${brightness-save-restore}/bin/brightness-save-restore save && ${pkgs.systemd}/bin/systemctl suspend' \
-        before-sleep '${unstable.noctalia-qs}/bin/qs -p ${noctalia-shell}/share/noctalia-shell ipc call lockScreen lock'
+        before-sleep '${unstable.noctalia-qs}/bin/qs -p ${unstable.noctalia-shell}/share/noctalia-shell ipc call lockScreen lock'
   '';
   
   # Wrapper script for Niri that forces AMD iGPU usage
@@ -439,7 +437,7 @@ let
             MESA_LOADER_DRIVER_OVERRIDE=radeonsi \
             VK_ICD_FILENAMES=/run/opengl-driver/share/vulkan/icd.d/radeon_icd.x86_64.json \
             __EGL_VENDOR_LIBRARY_FILENAMES=/run/opengl-driver/share/glvnd/egl_vendor.d/50_mesa.json \
-            ${pkgs.niri}/bin/niri-session "$@"
+            ${unstable.niri}/bin/niri-session "$@"
   '';
   
   # Custom desktop entry for Niri with AMD iGPU
@@ -456,70 +454,6 @@ let
     X-KDE-Wayland-Environment=WLR_DRM_NO_MODIFIERS=1;__GLX_VENDOR_LIBRARY_NAME=mesa;DRI_PRIME=0;__NV_PRIME_RENDER_OFFLOAD=0;__VK_LAYER_NV_optimus=;MESA_LOADER_DRIVER_OVERRIDE=radeonsi;VK_ICD_FILENAMES=/run/opengl-driver/share/vulkan/icd.d/radeon_icd.x86_64.json;__EGL_VENDOR_LIBRARY_FILENAMES=/run/opengl-driver/share/glvnd/egl_vendor.d/50_mesa.json
   '';
   
-  # Noctalia Shell - using official package.nix approach
-  noctalia-shell = pkgs.stdenvNoCC.mkDerivation rec {
-    pname = "noctalia-shell";
-    version = "4.7.5";
-
-    src = pkgs.fetchFromGitHub {
-      owner = "noctalia-dev";
-      repo = "noctalia-shell";
-      rev = "v4.7.5";
-      sha256 = "sha256-0xoCuJSRSWcn4mCX382lCxqLbnuOrrqS4dOcdpoUmZg=";  # v4.7.5 release
-    };
-    
-    nativeBuildInputs = with pkgs; [
-      qt6.wrapQtAppsHook
-    ];
-    
-    buildInputs = with pkgs; [
-      qt6.qtbase
-      qt6.qtmultimedia  # Required for SoundService.qml (QtMultimedia module)
-    ];
-    
-    # Runtime dependencies (from official package.nix)
-    runtimeDeps = with pkgs; [
-      unstable.noctalia-qs  # The qs binary
-      brightnessctl
-      cava
-      cliphist
-      ddcutil
-      matugen
-      wlsunset
-      wl-clipboard
-    ] ++ pkgs.lib.optionals (pkgs.stdenv.hostPlatform.system == "x86_64-linux") [
-      gpu-screen-recorder
-    ];
-    
-    fontsConf = pkgs.makeFontsConf {
-      fontDirectories = [
-        pkgs.roboto
-        pkgs.inter-nerdfont
-      ];
-    };
-    
-    installPhase = ''
-      mkdir -p $out/share/noctalia-shell $out/bin
-      cp -r . $out/share/noctalia-shell
-      ln -s ${unstable.noctalia-qs}/bin/qs $out/bin/noctalia-shell
-    '';
-    
-    preFixup = ''
-      qtWrapperArgs+=(
-        --prefix PATH : ${pkgs.lib.makeBinPath runtimeDeps}
-        --set FONTCONFIG_FILE ${fontsConf}
-        --add-flags "-p $out/share/noctalia-shell"
-      )
-    '';
-    
-    meta = {
-      description = "A sleek and minimal desktop shell for Wayland, built with Quickshell";
-      homepage = "https://github.com/noctalia-dev/noctalia-shell";
-      license = pkgs.lib.licenses.mit;
-      mainProgram = "noctalia-shell";
-    };
-  };
-  
          # Create AMD-optimized Niri session package
          # This forces Niri to use AMD iGPU (card1) instead of NVIDIA (card0)
   # With proprietary NVIDIA drivers, the GPU will automatically power down when not in use
@@ -531,7 +465,7 @@ let
   } ''
     # Symlink everything from niri package except the desktop entry we'll replace
     mkdir -p $out
-    for item in ${pkgs.niri}/*; do
+    for item in ${unstable.niri}/*; do
       name=$(basename "$item")
       if [ "$name" != "share" ]; then
         ln -s "$item" "$out/$name"
@@ -539,9 +473,9 @@ let
     done
     
     # Handle share directory specially - symlink subdirectories but replace wayland-sessions
-    if [ -d ${pkgs.niri}/share ]; then
+    if [ -d ${unstable.niri}/share ]; then
       mkdir -p $out/share
-      for item in ${pkgs.niri}/share/*; do
+      for item in ${unstable.niri}/share/*; do
         name=$(basename "$item")
         if [ "$name" != "wayland-sessions" ]; then
           ln -s "$item" "$out/share/$name"
@@ -623,10 +557,10 @@ in
   environment.systemPackages = with pkgs; [
     # niri binaries are needed, but the desktop entry comes from niri-amd-session
     # The session package should take precedence for the desktop entry
-    niri
+    unstable.niri
     xwayland-satellite
+    unstable.noctalia-shell
     unstable.noctalia-qs
-    noctalia-shell
     niri-amd-wrapper
     brightness-save-restore
     auto-brightness-sensor  # Auto brightness based on ambient light sensor
@@ -643,8 +577,6 @@ in
     # Note: Using Noctalia Shell's built-in lock screen via IPC instead of swaylock
   ] ++ pkgs.lib.optionals (pkgs.stdenv.hostPlatform.system == "x86_64-linux") [
     # gpu-screen-recorder is only available on x86_64-linux
-    # It's also included in noctalia-shell runtimeDeps, but adding it here
-    # makes it available system-wide for direct use
     gpu-screen-recorder
   ];
 
@@ -667,40 +599,18 @@ in
     wantedBy = [ "graphical-session.target" ];
     after = [ "graphical-session.target" ];
     serviceConfig = {
-      ExecStart = "${noctalia-shell}/bin/noctalia-shell";
+      ExecStart = "${unstable.noctalia-shell}/bin/noctalia-shell";
       Restart = "on-failure";
-      # Include system PATH so Noctalia can find sh, bash, brightnessctl, nmcli, etc.
-      # This is critical for brightness detection scripts and other hardware services
-      # We need to explicitly include system binaries in PATH since PassEnvironment may not
-      # include them if the service starts before the user session is fully initialized
       Environment = [
         "NOCTALIA_SETTINGS_FALLBACK=%h/.config/noctalia/gui-settings.json"
-        # Force Mesa/AMD for rendering (not critical for Noctalia, but helps with consistency)
         "__GLX_VENDOR_LIBRARY_NAME=mesa"
         "DRI_PRIME=0"
         "__NV_PRIME_RENDER_OFFLOAD=0"
         "__VK_LAYER_NV_optimus="
-        # Explicitly add system PATH to ensure sh, brightnessctl, nmcli, gpu-screen-recorder, etc. are found
-        # This ensures critical system binaries are available even if user session PATH isn't set yet
-        # /run/current-system/sw/bin includes all system packages (brightnessctl, nmcli, sh, gpu-screen-recorder, etc.)
-        # Also include the noctalia-shell wrapper's PATH which includes runtimeDeps (gpu-screen-recorder is in runtimeDeps)
-        # Note: PassEnvironment will append user session PATH, but system PATH takes precedence
-        "PATH=/run/wrappers/bin:${pkgs.lib.makeBinPath (with pkgs; [
-          unstable.noctalia-qs
-          brightnessctl
-          cava
-          cliphist
-          ddcutil
-          matugen
-          wlsunset
-          wl-clipboard
-        ] ++ pkgs.lib.optionals (pkgs.stdenv.hostPlatform.system == "x86_64-linux") [
-          gpu-screen-recorder
-        ])}:/run/current-system/sw/bin:/run/current-system/sw/sbin:/usr/bin:/usr/sbin:/bin:/sbin"
+        # nixpkgs noctalia-shell wrapper bakes in runtime deps (brightnessctl, cliphist, etc.)
+        # system PATH covers anything else (cava, matugen, nmcli, gpu-screen-recorder, etc.)
+        "PATH=/run/wrappers/bin:/run/current-system/sw/bin:/run/current-system/sw/sbin:/usr/bin:/usr/sbin:/bin:/sbin"
       ];
-      # Pass PATH from the user session so Noctalia can find system binaries
-      # This is required for brightness detection scripts and other hardware services
-      # The system PATH above ensures critical binaries are always available
       PassEnvironment = [ "PATH" ];
     };
   };
