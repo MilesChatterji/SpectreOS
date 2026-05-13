@@ -23,6 +23,28 @@ The `<unstable>` channel and `let unstable = import <unstable> ...` binding were
 
 ---
 
+## Noctalia Shell Simplification (2026-05-12)
+
+Removed the custom `stdenvNoCC` derivation that was manually tracking noctalia-shell releases via `fetchFromGitHub`. Switched to `unstable.noctalia-shell` from nixpkgs unstable, same as noctalia-qs.
+
+### What changed
+
+- Deleted ~70 lines of custom derivation code (pname, version, src, buildInputs, runtimeDeps, wrappers, etc.)
+- `noctalia-shell` references in `niri.nix` now point to `unstable.noctalia-shell`
+- Simplified `noctalia.service` PATH and environment — the upstream nixpkgs package bakes in runtime deps (brightnessctl, cliphist, etc.) so manual PATH wrangling is no longer needed
+- Updated swayidle lock screen calls to use `unstable.noctalia-shell` path instead of the old custom derivation
+
+### Why
+
+The upstream nixpkgs unstable package now handles everything the custom derivation was doing. Maintaining a custom derivation meant manually bumping versions and hashes — unnecessary now that it's in nixpkgs.
+
+### Notes
+
+- Future SpectreOS builds should use `unstable.noctalia-shell` — no custom derivation needed
+- If noctalia-shell ever needs to track a version ahead of nixpkgs unstable, the old derivation pattern can be restored from git history (`f89d6b9`)
+
+---
+
 ## Blur Configuration (2026-05-13)
 
 Added blur support to `~/.config/niri/config.kdl` (not tracked in this repo — user config).
