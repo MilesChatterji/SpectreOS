@@ -20,3 +20,38 @@ The `<unstable>` channel and `let unstable = import <unstable> ...` binding were
 
 - Both `nixos` and `unstable` channels update together with `nix-channel --update`
 - Watch niri's changelog for KDL config breaking changes after updates — these would be immediately visible at login
+
+---
+
+## Blur Configuration (2026-05-13)
+
+Added blur support to `~/.config/niri/config.kdl` (not tracked in this repo — user config).
+
+### Changes made
+
+1. **Global blur parameters** added after the animations comment block:
+```kdl
+blur {
+    passes 3
+    offset 3
+    noise 0.02
+    saturation 1.5
+}
+```
+
+2. **Ghostty window rule** added to force blur (Ghostty's `background-blur` is macOS-native; on Wayland niri must apply it directly):
+```kdl
+window-rule {
+    match app-id=r#"^com\.mitchellh\.ghostty$"#
+    background-effect {
+        blur true
+    }
+}
+```
+
+### Notes
+
+- Ghostty config has `background-opacity = 0.65` and `background-blur = true` — the opacity is what makes blur visible
+- Noctalia Shell panel surfaces request blur themselves via `ext-background-effect` protocol — no layer-rule needed
+- Noctalia settings panel does not yet support blur — leave it for upstream to implement
+- Future SpectreOS default configs should include these blur rules
