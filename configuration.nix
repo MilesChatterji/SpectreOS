@@ -450,6 +450,16 @@ in
     mode = "0755";
   };
 
+  environment.etc."spectreos/dry-run-helper.sh" = {
+    text = ''
+      #!/usr/bin/env bash
+      set -euo pipefail
+      export PATH="/run/current-system/sw/bin:/nix/var/nix/profiles/default/bin:$PATH"
+      nixos-rebuild dry-build 2>&1
+    '';
+    mode = "0755";
+  };
+
   environment.etc."spectreos/rollback-helper.sh" = {
     text = ''
       #!/usr/bin/env bash
@@ -476,6 +486,7 @@ in
   security.sudo.extraConfig = ''
     %wheel ALL=(root) NOPASSWD: /etc/spectreos/upgrade-helper.sh *
     %wheel ALL=(root) NOPASSWD: /etc/spectreos/rebuild-helper.sh
+    %wheel ALL=(root) NOPASSWD: /etc/spectreos/dry-run-helper.sh
     %wheel ALL=(root) NOPASSWD: /etc/spectreos/rollback-helper.sh *
     %wheel ALL=(root) NOPASSWD: /etc/spectreos/list-generations-helper.sh
   '';
