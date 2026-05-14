@@ -445,6 +445,7 @@ in
       #!/usr/bin/env bash
       set -euo pipefail
       export PATH="/run/current-system/sw/bin:/nix/var/nix/profiles/default/bin:$PATH"
+      nix-channel --update
       nixos-rebuild switch
     '';
     mode = "0755";
@@ -455,6 +456,7 @@ in
       #!/usr/bin/env bash
       set -euo pipefail
       export PATH="/run/current-system/sw/bin:/nix/var/nix/profiles/default/bin:$PATH"
+      nix-channel --update
       nixos-rebuild dry-build 2>&1
     '';
     mode = "0755";
