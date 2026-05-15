@@ -218,7 +218,13 @@ in
   # Power management - works with both GNOME and Niri
   # This is what GNOME's power save mode uses, so they work together
   services.power-profiles-daemon.enable = true;
-  
+
+  # Enable runtime PM for the MediaTek mt7925e wifi card (PCI 0000:c3:00.0)
+  # Without this the card stays fully powered even when idle, running hot on weak signals
+  services.udev.extraRules = ''
+    ACTION=="add", SUBSYSTEM=="pci", ATTR{vendor}=="0x14c3", ATTR{device}=="0x7925", ATTR{power/control}="auto"
+  '';
+
   # Configure logind for better power management
   # NixOS 25.11: All logind options moved to settings.Login
   services.logind = {
