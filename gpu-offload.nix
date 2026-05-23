@@ -228,34 +228,38 @@ in
     ACTION=="add", SUBSYSTEM=="pci", ATTR{vendor}=="0x10de", ATTR{class}=="0x030200", TEST=="power/control", ATTR{power/control}="auto"
     ACTION=="add", SUBSYSTEM=="pci", ATTR{vendor}=="0x10de", ATTR{class}=="0x040300", TEST=="power/control", ATTR{power/control}="auto"
     ACTION=="add", SUBSYSTEM=="pci", ATTR{vendor}=="0x10de", ATTR{class}=="0x0c0330", TEST=="power/control", ATTR{power/control}="auto"
+    # Keep the PCIe root port for the NVIDIA GPU (0000:00:03.1, bus c4) from runtime-suspending.
+    # On kernel 7.0.9+, empty downstream buses cause root ports to aggressively suspend.
+    # When supergfxd powers the dGPU on from Integrated mode and rescans PCI, a suspended
+    # root port fails to route an IRQ to the newly-appeared device, causing nvidia probe to fail.
+    ACTION=="add", SUBSYSTEM=="pci", KERNEL=="0000:00:03.1", ATTR{power/control}="on"
   '';
 
-  # ASUS GPU switching daemon — powers the dGPU completely off when not needed.
+  # ASUS GPU switching daemon.
   # This platform's firmware does not support NVIDIA RTD3 (D3cold), so the GPU
   # sits at ~6W in P8 idle when NVIDIA modules are loaded regardless of driver config.
   # supergfxd in Integrated mode bypasses RTD3 entirely via ASUS WMI, reaching ~0W.
   #
-  # Default mode: Integrated (dGPU off, best battery life).
-  # To use NVIDIA GPU (e.g. DaVinci Resolve):
-  #   supergfxctl -m Hybrid   → logout/login → nvidia-offload <app>
-  # To return to battery-optimised state:
-  #   supergfxctl -m Integrated → logout/login
-  #
-  # NOTE: Switching modes requires logout. This config resets to Integrated on nixos-rebuild,
-  # so edit mode to "Hybrid" here if you want that to persist across rebuilds.
+  # Default mode: Hybrid (dGPU on from boot).
+  # Kernel 7.0.9+ has a PCIe hotplug IRQ bug: the NVIDIA driver cannot claim an IRQ
+  # for a device that was powered off at boot and later hotplugged by supergfxd.
+  # Hybrid keeps the GPU on so the driver probes at boot-time where IRQ allocation works.
+  # Use nvidia-offload <app> to run applications on the NVIDIA GPU.
+  # For battery travel: supergfxctl -m Integrated → logout/login before unplugging.
+  # This config resets to Hybrid on nixos-rebuild; change mode here to persist Integrated.
   #
   # OS-BUILDER: supergfxd is ASUS-specific. Exclude from base and VM images.
   services.supergfxd = {
     enable = true;
     settings = {
-      mode = "Integrated";
+      mode = "Hybrid";
       vfio_enable = false;
       vfio_save = false;
       compute_save = false;
       always_reboot = false;
       no_logind = false;
       logout_timeout_s = 180;
-      hotplug_type = "None";
+      hotplug_type = "Std";
     };
   };
 }

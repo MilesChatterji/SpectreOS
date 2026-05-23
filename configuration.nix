@@ -203,13 +203,13 @@ in
   # Kernel 7; default on 25.11 is 6.12. NVIDIA 580.126.18 from unstable in gpu-offload.nix.
   boot.kernelPackages = pkgs.linuxKernel.packages.linux_7_0;
 
-  # Kernel parameters for DisplayPort Multi-Stream Transport (DP-MST) support
-  # Note: MST debugging removed - was causing excessive logging and performance issues
-  # MST is enabled by default in the kernel
-  # To re-enable MST debugging in the future (if needed), add: "drm.debug=0x04" (MST only, less verbose)
-  # boot.kernelParams = [
-  #   "drm.debug=0x04"  # MST debug only (much less verbose than 0x1e)
-  # ];
+  # amd_iommu=off: disables AMD IOMMU entirely, including interrupt remapping.
+  # On kernel 7.0.9+, AMD IOMMU interrupt remapping blocks MSI for the NVIDIA GPU
+  # at c4:00.0. Confirmed clean boot enumeration with this set.
+  # supergfxd defaults to Hybrid so the driver probes at boot (hotplug IRQ path is broken
+  # on 7.0.9 — see gpu-offload.nix).
+  # acpi_osi=Linux: ASUS firmware ACPI compatibility.
+  boot.kernelParams = [ "amd_iommu=off" "acpi_osi=Linux" ];
   
   #Asus specific firmware controllers
   services.fwupd.enable = true;
