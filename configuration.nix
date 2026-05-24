@@ -203,13 +203,13 @@ in
   # Kernel 7; default on 25.11 is 6.12. NVIDIA 580.126.18 from unstable in gpu-offload.nix.
   boot.kernelPackages = pkgs.linuxKernel.packages.linux_7_0;
 
-  # amd_iommu=off: disables AMD IOMMU entirely, including interrupt remapping.
-  # On kernel 7.0.9+, AMD IOMMU interrupt remapping blocks MSI for the NVIDIA GPU
-  # at c4:00.0. Confirmed clean boot enumeration with this set.
-  # supergfxd defaults to Hybrid so the driver probes at boot (hotplug IRQ path is broken
-  # on 7.0.9 — see gpu-offload.nix).
+  # iommu=pt: AMD IOMMU passthrough (DMA direct, interrupt remapping active).
+  # Kernel 7.0.9 has an AMD IOMMU regression (__rlookup_amd_iommu bounds check) that
+  # corrupts MSI setup for the NVIDIA GPU — probe fails with "Can't find an IRQ" regardless
+  # of IOMMU config. Fixed in 7.0.10. Running on 7.0.5 generation until 7.0.10 lands.
+  # iommu=pt is the right setting for when 7.0.10 is tested (GPU in Hybrid mode from boot).
   # acpi_osi=Linux: ASUS firmware ACPI compatibility.
-  boot.kernelParams = [ "amd_iommu=off" "acpi_osi=Linux" ];
+  boot.kernelParams = [ "iommu=pt" "acpi_osi=Linux" ];
   
   #Asus specific firmware controllers
   services.fwupd.enable = true;
