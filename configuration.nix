@@ -293,6 +293,16 @@ in
   # Enable CUPS to print documents.
   services.printing.enable = true;
 
+  # dconf — required for home-manager GTK/dconf settings activation
+  programs.dconf.enable = true;
+
+  # XDG desktop portals — file pickers, screen sharing, etc. for Wayland apps
+  xdg.portal = {
+    enable = true;
+    extraPortals = [ pkgs.xdg-desktop-portal-gtk ];
+    config.common.default = [ "gtk" ];
+  };
+
   # Color management service (colord)
   # Manages ICC color profiles for displays and printers
   # Profiles set in GNOME will persist and work across all sessions (including Niri)
