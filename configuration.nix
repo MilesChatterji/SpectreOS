@@ -203,11 +203,11 @@ in
   # Kernel 7; default on 25.11 is 6.12. NVIDIA 580.126.18 from unstable in gpu-offload.nix.
   boot.kernelPackages = pkgs.linuxKernel.packages.linux_7_0;
 
-  # iommu=pt: AMD IOMMU passthrough (DMA direct, interrupt remapping active).
-  # Kernel 7.0.9 has an AMD IOMMU regression (__rlookup_amd_iommu bounds check) that
-  # corrupts MSI setup for the NVIDIA GPU — probe fails with "Can't find an IRQ" regardless
-  # of IOMMU config. Fixed in 7.0.10. Running on 7.0.5 generation until 7.0.10 lands.
-  # iommu=pt is the right setting for when 7.0.10 is tested (GPU in Hybrid mode from boot).
+  # iommu=pt: AMD IOMMU passthrough — correct setting for daily use on 7.0.5 generation.
+  # 7.0.9 and 7.0.10 have a PCIe MSI regression for the NVIDIA RTX 4050 Max-Q on Strix Halo:
+  # NVRM: Can't find an IRQ — fails regardless of iommu=pt, intremap=off, or amd_iommu=off.
+  # PCIe hotplug slot power write (/sys/bus/pci/slots/0-2/power) also regressed on 7.0.9+.
+  # Booting 7.0.5 generation from bootloader until upstream fix lands.
   # acpi_osi=Linux: ASUS firmware ACPI compatibility.
   boot.kernelParams = [ "iommu=pt" "acpi_osi=Linux" ];
   

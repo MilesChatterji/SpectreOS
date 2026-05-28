@@ -213,11 +213,9 @@ in
   # Note: nouveau is automatically blacklisted when proprietary drivers are enabled
   # The NVIDIA GPU will power down when not in use, saving significant power
 
-  # Enable NVIDIA RTD3 (runtime D3) power management manually.
-  # This is what hardware.nvidia.powerManagement.finegrained does internally,
-  # but that option requires hardware.nvidia.prime.offload.enable (and bus IDs).
-  # Since we use environment-variable-based offload instead of NixOS's PRIME module,
-  # we replicate the effect directly here.
+  # NVreg_DynamicPowerManagement=0x02 requests fine-grained power management from the
+  # nvidia driver. RTD3 (D3cold) is not supported on PX13 firmware (no _PR3 ACPI method),
+  # so the driver will not actually enter D3cold — this is a no-op but harmless to keep.
   boot.extraModprobeConfig = ''
     options nvidia NVreg_DynamicPowerManagement=0x02
   '';
@@ -229,26 +227,25 @@ in
     ACTION=="add", SUBSYSTEM=="pci", ATTR{vendor}=="0x10de", ATTR{class}=="0x040300", TEST=="power/control", ATTR{power/control}="auto"
     ACTION=="add", SUBSYSTEM=="pci", ATTR{vendor}=="0x10de", ATTR{class}=="0x0c0330", TEST=="power/control", ATTR{power/control}="auto"
     # Keep the PCIe root port for the NVIDIA GPU (0000:00:03.1, bus c4) from runtime-suspending.
-    # On kernel 7.0.9+, empty downstream buses cause root ports to aggressively suspend.
-    # When supergfxd powers the dGPU on from Integrated mode and rescans PCI, a suspended
-    # root port fails to route an IRQ to the newly-appeared device, causing nvidia probe to fail.
     ACTION=="add", SUBSYSTEM=="pci", KERNEL=="0000:00:03.1", ATTR{power/control}="on"
   '';
 
   # ASUS GPU switching daemon.
   # This platform's firmware does not support NVIDIA RTD3 (D3cold), so the GPU
   # sits at ~6W in P8 idle when NVIDIA modules are loaded regardless of driver config.
-  # supergfxd in Integrated mode bypasses RTD3 entirely via ASUS WMI, reaching ~0W.
+  # supergfxd in Integrated mode unloads the driver, dropping to ~0W draw.
   #
   # Default mode: Hybrid (dGPU on from boot).
-  # Kernel 7.0.9+ has a PCIe hotplug IRQ bug: the NVIDIA driver cannot claim an IRQ
-  # for a device that was powered off at boot and later hotplugged by supergfxd.
-  # Hybrid keeps the GPU on so the driver probes at boot-time where IRQ allocation works.
+  # hotplug_type = "None": PX13 exposes neither dgpu_disable WMI (Asus type) nor a
+  # working PCIe hotplug slot power path (Std type). None skips power cycling entirely
+  # and lets supergfxd manage only module load/unload. The GPU stays physically powered
+  # on from firmware; the udev rules above keep it from entering D3cold prematurely.
   # Use nvidia-offload <app> to run applications on the NVIDIA GPU.
   # For battery travel: supergfxctl -m Integrated → logout/login before unplugging.
   # This config resets to Hybrid on nixos-rebuild; change mode here to persist Integrated.
   #
   # OS-BUILDER: supergfxd is ASUS-specific. Exclude from base and VM images.
+  boot.kernelModules = [ "asus_nb_wmi" ];
   services.supergfxd = {
     enable = true;
     settings = {
