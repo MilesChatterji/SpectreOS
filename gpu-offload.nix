@@ -211,7 +211,7 @@ in
   # sits at ~6W in P8 idle when NVIDIA modules are loaded regardless of driver config.
   # supergfxd in Integrated mode unloads the driver, dropping to ~0W draw.
   #
-  # Default mode: Hybrid (dGPU on from boot).
+  # Default mode: Integrated (0W GPU draw — switch to Hybrid when NVIDIA needed).
   # hotplug_type = "None": PX13 exposes neither dgpu_disable WMI (Asus type) nor a
   # working PCIe hotplug slot power path (Std type). None skips power cycling entirely
   # and lets supergfxd manage only module load/unload. The GPU stays physically powered
@@ -225,7 +225,7 @@ in
   services.supergfxd = {
     enable = true;
     settings = {
-      mode = "Hybrid";
+      mode = "Integrated";
       vfio_enable = false;
       vfio_save = false;
       compute_save = false;
