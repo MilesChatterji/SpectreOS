@@ -29,20 +29,36 @@ This repo contains the live PX13 host configuration. Changes here go to `/etc/ni
 - `xdg.portal` block — base configures xdg-desktop-portal-gtk; host doesn't
 - `systemd.services.greetd.environment.TERM = "xterm-256color"` — N/A on host (uses GDM, not greetd)
 
-## Upcoming work — NVIDIA + newer kernel compatibility
+## Active kernel regressions — running 7.0.5 (bootloader selection)
 
-Next session focus: get NVIDIA RTX 4050 Max-Q working reliably with kernel 7.x.
+Two confirmed regressions in kernel 7.0.10 on this hardware. Both filed at bugs.kernel.org.
+Stay on 7.0.5 generation until upstream fixes land. Periodically rebuild the 26.05 generation
+and test — when both regressions are resolved, switch back.
 
-**Context:** Kernel 7.0.9 had an AMD IOMMU regression (`__rlookup_amd_iommu` bounds check) that broke NVIDIA MSI IRQ setup regardless of IOMMU config. Workaround was to stay on 7.0.5. Fixed in 7.0.10 per kernel changelog — but Miles has not yet tested 7.0.10+ on this hardware. Once a new stable kernel lands on the host's channel, upgrade and validate:
-1. NVIDIA probe succeeds (`nvidia-smi` works, no "Can't find an IRQ" in dmesg)
-2. PRIME offload functions (`niri-session-amd` wrapper still routes iGPU correctly)
-3. `iommu=pt` kernel param can stay (correct for AMD IOMMU passthrough when GPU works)
+### 1. NVIDIA MSI IRQ regression (7.0.9+)
+`NVRM: Can't find an IRQ for your NVIDIA card!` — nvidia probe fails regardless of IOMMU config.
+Fixed in 26.05's build of 7.0.10 (nvidia-smi confirmed working). **Resolved.**
+See `nvidia-msi-regression-bug-report.md`.
 
-**gpu-offload.nix** contains the PRIME/offload config and NVIDIA driver pin. Changes to make NVIDIA work on a newer kernel likely land there, not in configuration.nix.
+### 2. Platform power management regression (7.0.10)
+Idle battery draw ~3x higher on 7.0.10 vs 7.0.5 on AMD Ryzen AI 9 HX 370 (Strix Halo).
+- 7.0.5: ~8h battery, normal idle
+- 7.0.10: ~2.5h battery, ~17W idle with nothing running
+- Workarounds tried: `amd_pstate=passive`, `amdgpu.ppfeaturemask=0xffff7fff` — slight improvement only
+- Root cause: unknown delta between 7.0.5 and 7.0.10; platform C-states unaffected, GPU not the cause
+- ACPI GPP4 errors at boot: present on both kernels, not the cause
+- See `kernel-power-regression-bug-report.md`
 
-**niri.nix** has the AMD GPU wrapper (`niri-session-amd`) — re-enable the commented-out PX13 blocks once GPU situation is stable.
+### When testing a new kernel build
+1. Boot 26.05 generation from bootloader
+2. Check `nvidia-smi` — should work (MSI regression resolved in 26.05)
+3. Check idle battery draw — should be ~5-6W with nothing running
+4. If both pass, switch back to 26.05 as default generation
 
-**This may require local-only changes** that should NOT be upstreamed to SpectreOS26.05. Anything in gpu-offload.nix or the NVIDIA driver pin is PX13-specific and stays here.
+### Config notes for 7.0.5 generation
+`configuration.nix` kernelParams: `iommu=pt acpi_osi=Linux amd_pstate=passive`
+`gpu-offload.nix` extraModprobeConfig: includes `amdgpu ppfeaturemask=0xffff7fff`
+These are safe on 7.0.5 and may improve power on future kernels when the regression is fixed.
 
 ## Known changes and why
 

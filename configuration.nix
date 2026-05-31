@@ -209,7 +209,9 @@ in
   # PCIe hotplug slot power write (/sys/bus/pci/slots/0-2/power) also regressed on 7.0.9+.
   # Booting 7.0.5 generation from bootloader until upstream fix lands.
   # acpi_osi=Linux: ASUS firmware ACPI compatibility.
-  boot.kernelParams = [ "iommu=pt" "acpi_osi=Linux" ];
+  # amd_pstate=passive: hands P-state control to kernel cpufreq governors rather than
+  # hardware-autonomous mode; reported to significantly reduce idle power on AMD systems.
+  boot.kernelParams = [ "iommu=pt" "acpi_osi=Linux" "amd_pstate=passive" ];
   
   #Asus specific firmware controllers
   services.fwupd.enable = true;

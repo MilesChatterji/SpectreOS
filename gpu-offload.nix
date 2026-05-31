@@ -194,6 +194,9 @@ in
   # so the driver will not actually enter D3cold — this is a no-op but harmless to keep.
   boot.extraModprobeConfig = ''
     options nvidia NVreg_DynamicPowerManagement=0x02
+    # Disable PP_GFXOFF to work around an amdgpu idle power regression introduced in
+    # kernel 6.18 where PP_GFXOFF misbehaves and doubles GPU idle draw on some platforms.
+    options amdgpu ppfeaturemask=0xffff7fff
   '';
 
   services.udev.extraRules = ''
