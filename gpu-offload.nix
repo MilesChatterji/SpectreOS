@@ -3,11 +3,9 @@
 # This reduces power consumption significantly
 # System: AMD Ryzen AI 9 HX 370 with Radeon 890M (card1/amdgpu) + NVIDIA discrete (card0/nvidia)
 #
-# NOTE: NVIDIA driver pulled from nixos-unstable for 595.x. The stable 25.11 channel has
-# 580.142 which has lower idle power but we stay on unstable to track 595.x improvements.
-# The .mod split (boot.extraModulePackages) is an unstable restructuring that stable will
-# likely adopt — keeping it now avoids a future surprise when stable catches up.
-# When upgrading, update the version note in the fetchTarball comment below.
+# NOTE: NVIDIA driver from NixOS 26.05 stable channel — nvidiaPackages.stable resolves to
+# 595.x in 26.05. Previously pulled from nixos-unstable for 595.x power management; no
+# longer needed since stable caught up. The .mod split from the unstable era is gone.
 #
 # ASUS PX13 HARDWARE NOTE — OS-BUILDER: This file is specific to the ASUS ProArt PX13
 # (AMD Ryzen AI 9 HX 370 + NVIDIA dGPU). Do NOT include supergfxd or this GPU offload
@@ -17,22 +15,6 @@
 { config, pkgs, ... }:
 
 let
-  # Import nixpkgs-unstable only for the NVIDIA driver (595.x).
-  # Using unstable.linuxKernel.packages.linux_7_0.nvidiaPackages gives the full, correctly
-  # wired package — userspace libs AND kernel modules built against linux_7_0. This is safe
-  # because stable 25.11 and unstable both use the same linux_7_0 source hash, so modules
-  # built from the unstable package set load without issue on the system's running kernel.
-  unstable = import (builtins.fetchTarball {
-    # Tracking nixos-unstable. No sha256 pin — intentionally unpinned to pick up
-    # driver improvements automatically. Current as of 2026-05-08: NVIDIA 595.71.05.
-    # When upgrading, note the new version and date here so version history is preserved.
-    url = "https://github.com/NixOS/nixpkgs/archive/nixos-unstable.tar.gz";
-  }) {
-    config.allowUnfree = true;
-    inherit (config.nixpkgs) system;
-  };
-  unstableNvidiaPackages = unstable.linuxKernel.packages.linux_7_0.nvidiaPackages;
-
   # NVIDIA offload wrapper script
   # Use this to run applications on the NVIDIA GPU instead of AMD iGPU
   # Example: nvidia-offload davinci-resolve
@@ -172,15 +154,9 @@ in
     # Enable support for 32-bit applications (needed for some games/apps)
     nvidiaSettings = true;
     
-    # 595.x production driver from nixos-unstable — better RTD3 than stable 25.11's 580.x.
-    package = unstableNvidiaPackages.production;
+    # 595.x from NixOS 26.05 stable. nvidiaPackages.stable tracks the NVIDIA stable branch.
+    package = pkgs.linuxKernel.packages.linux_7_0.nvidiaPackages.stable;
   };
-
-  # nixpkgs-unstable restructured the NVIDIA driver: kernel modules are now a separate
-  # .mod output (nvidia-kernel-modules-<ver>-<kernel>), not included in the main package.
-  # Stable 25.11's hardware.nvidia module only adds cfg.package to extraModulePackages,
-  # which is the userspace-only derivation. Adding .mod explicitly provides the .ko files.
-  boot.extraModulePackages = [ unstableNvidiaPackages.production.mod ];
   
   # Set environment variables for PRIME offloading
   # Use AMD 890M iGPU by default, NVIDIA via nvidia-offload wrapper
@@ -256,7 +232,7 @@ in
       always_reboot = false;
       no_logind = false;
       logout_timeout_s = 180;
-      hotplug_type = "Std";
+      hotplug_type = "None";
     };
   };
 }
