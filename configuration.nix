@@ -3,9 +3,8 @@
 # and in the NixOS manual (accessible by running ‘nixos-help’).
 
 { config, pkgs, lib, ... }:
-let 
+let
    unstable = import <unstable> { config.allowUnfree = true; };
-   
    # Custom SpectreOS Plymouth theme - Step 2: Logo + Progress Bars
    spectreos-plymouth-theme = pkgs.runCommand "spectreos-plymouth-theme" {
      splashImage = builtins.path {
@@ -200,18 +199,25 @@ in
     themePackages = [ spectreos-plymouth-theme ];
   };
 
-  # Kernel 7; default on 25.11 is 6.12. NVIDIA 580.126.18 from unstable in gpu-offload.nix.
+  # 2026-06-09: Kernel pin removed (step 2 of unpin ladder).
+  # Step 1 (clean config + pinned 7.0.5) confirmed 5-6W idle + clean S0i3 suspend.
+  # Now testing 7.0.11 (current channel kernel) with same clean config.
+  # If power is good: remove firmware overlay (step 3), then switch to 26.05 (step 4).
   boot.kernelPackages = pkgs.linuxKernel.packages.linux_7_0;
 
-  # iommu=pt: AMD IOMMU passthrough — correct setting for daily use on 7.0.5 generation.
-  # 7.0.9 and 7.0.10 have a PCIe MSI regression for the NVIDIA RTX 4050 Max-Q on Strix Halo:
-  # NVRM: Can't find an IRQ — fails regardless of iommu=pt, intremap=off, or amd_iommu=off.
-  # PCIe hotplug slot power write (/sys/bus/pci/slots/0-2/power) also regressed on 7.0.9+.
-  # Booting 7.0.5 generation from bootloader until upstream fix lands.
-  # acpi_osi=Linux: ASUS firmware ACPI compatibility.
-  # amd_pstate=passive: hands P-state control to kernel cpufreq governors rather than
-  # hardware-autonomous mode; reported to significantly reduce idle power on AMD systems.
-  boot.kernelParams = [ "iommu=pt" "acpi_osi=Linux" "amd_pstate=passive" ];
+  # 2026-06-09: ALL diagnostic kernel params removed to match gen 198 (the only good gen).
+  # Verified via /proc/cmdline that gen 198 boots with NO extra params — no iommu=pt,
+  # no acpi_osi=Linux, no amd_pstate=passive, no pci=noaer. The diagnostic params added
+  # during the 2026-06-04 power investigation (amd_pstate=passive, pci=noaer, ppfeaturemask,
+  # amd_pmf blacklist, amd_pmc disable_workarounds) were present on every BAD generation
+  # and absent from gen 198 — they are now the prime suspect for the persistent regression
+  # (ppfeaturemask=0xffff7fff disables PP_GFXOFF, which blocks APU deep idle AND S0i3).
+  # History: iommu=pt + acpi_osi=Linux were added for the 7.0.9/7.0.10 NVIDIA MSI IRQ
+  # regression era (resolved in 26.05's 7.0.10 build); gen 198 never had them.
+  boot.kernelParams = [ ];
+
+  # 2026-06-09: amd_pmf blacklist removed — gen 198 (good power) runs with amd_pmf loaded.
+  # The blacklist was a 2026-06-04 diagnostic that produced no improvement.
   
   #Asus specific firmware controllers
   services.fwupd.enable = true;

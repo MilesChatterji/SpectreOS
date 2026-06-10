@@ -154,8 +154,8 @@ in
     # Enable support for 32-bit applications (needed for some games/apps)
     nvidiaSettings = true;
     
-    # 595.x from NixOS 26.05 stable. nvidiaPackages.stable tracks the NVIDIA stable branch.
-    package = pkgs.linuxKernel.packages.linux_7_0.nvidiaPackages.stable;
+    # Follow boot.kernelPackages so the NVIDIA driver always matches the pinned kernel.
+    package = config.boot.kernelPackages.nvidiaPackages.stable;
   };
   
   # Set environment variables for PRIME offloading
@@ -192,21 +192,27 @@ in
   # NVreg_DynamicPowerManagement=0x02 requests fine-grained power management from the
   # nvidia driver. RTD3 (D3cold) is not supported on PX13 firmware (no _PR3 ACPI method),
   # so the driver will not actually enter D3cold — this is a no-op but harmless to keep.
+  # 2026-06-09: Removed `options amdgpu ppfeaturemask=0xffff7fff` and
+  # `options amd_pmc disable_workarounds=1` (added 2026-06-04 as power-regression
+  # diagnostics). Gen 198 — the only generation with good power — has NEITHER option
+  # (verified via its modprobe.d in the nix store). ppfeaturemask=0xffff7fff disables
+  # PP_GFXOFF, which on an APU keeps the GFX IP block powered, raising idle draw and
+  # blocking S0i3 entry — i.e. the "mitigation" likely CAUSED the symptoms it was
+  # meant to fix on every generation built after gen 198.
   boot.extraModprobeConfig = ''
     options nvidia NVreg_DynamicPowerManagement=0x02
-    # Disable PP_GFXOFF to work around an amdgpu idle power regression introduced in
-    # kernel 6.18 where PP_GFXOFF misbehaves and doubles GPU idle draw on some platforms.
-    options amdgpu ppfeaturemask=0xffff7fff
   '';
 
+  # 2026-06-09: Removed the rule forcing root port 0000:00:03.1 power/control="on".
+  # Gen 198 (good power) does NOT have it — verified its root port is "auto" and
+  # runtime-suspended, with the dGPU below it reaching D3cold (~0W). Forcing the root
+  # port on keeps the PCIe fabric awake, can prevent dGPU D3cold, and blocks S0i3.
   services.udev.extraRules = ''
     # Allow NVIDIA GPU (VGA/3D controller/Audio/USB) to runtime suspend when idle
     ACTION=="add", SUBSYSTEM=="pci", ATTR{vendor}=="0x10de", ATTR{class}=="0x030000", TEST=="power/control", ATTR{power/control}="auto"
     ACTION=="add", SUBSYSTEM=="pci", ATTR{vendor}=="0x10de", ATTR{class}=="0x030200", TEST=="power/control", ATTR{power/control}="auto"
     ACTION=="add", SUBSYSTEM=="pci", ATTR{vendor}=="0x10de", ATTR{class}=="0x040300", TEST=="power/control", ATTR{power/control}="auto"
     ACTION=="add", SUBSYSTEM=="pci", ATTR{vendor}=="0x10de", ATTR{class}=="0x0c0330", TEST=="power/control", ATTR{power/control}="auto"
-    # Keep the PCIe root port for the NVIDIA GPU (0000:00:03.1, bus c4) from runtime-suspending.
-    ACTION=="add", SUBSYSTEM=="pci", KERNEL=="0000:00:03.1", ATTR{power/control}="on"
   '';
 
   # ASUS GPU switching daemon.

@@ -29,36 +29,26 @@ This repo contains the live PX13 host configuration. Changes here go to `/etc/ni
 - `xdg.portal` block — base configures xdg-desktop-portal-gtk; host doesn't
 - `systemd.services.greetd.environment.TERM = "xterm-256color"` — N/A on host (uses GDM, not greetd)
 
-## Active kernel regressions — running 7.0.5 (bootloader selection)
+## Kernel regressions — now running 26.05 + 7.0.11 (gen 209)
 
-Two confirmed regressions in kernel 7.0.10 on this hardware. Both filed at bugs.kernel.org.
-Stay on 7.0.5 generation until upstream fixes land. Periodically rebuild the 26.05 generation
-and test — when both regressions are resolved, switch back.
+Both confirmed regressions resolved. System now on 26.05 + 7.0.11 as daily driver.
 
-### 1. NVIDIA MSI IRQ regression (7.0.9+)
+### 1. NVIDIA MSI IRQ regression (7.0.9+) — RESOLVED
 `NVRM: Can't find an IRQ for your NVIDIA card!` — nvidia probe fails regardless of IOMMU config.
-Fixed in 26.05's build of 7.0.10 (nvidia-smi confirmed working). **Resolved.**
+Fixed in 26.05's build of 7.0.10 (nvidia-smi confirmed working).
 See `nvidia-msi-regression-bug-report.md`.
 
-### 2. Platform power management regression (7.0.10)
-Idle battery draw ~3x higher on 7.0.10 vs 7.0.5 on AMD Ryzen AI 9 HX 370 (Strix Halo).
-- 7.0.5: ~8h battery, normal idle
-- 7.0.10: ~2.5h battery, ~17W idle with nothing running
-- Workarounds tried: `amd_pstate=passive`, `amdgpu.ppfeaturemask=0xffff7fff` — slight improvement only
-- Root cause: unknown delta between 7.0.5 and 7.0.10; platform C-states unaffected, GPU not the cause
-- ACPI GPP4 errors at boot: present on both kernels, not the cause
-- See `kernel-power-regression-bug-report.md`
+### 2. Platform power management regression — RESOLVED (2026-06-09)
+Root cause was **diagnostic config residue**, not a kernel regression:
+- `ppfeaturemask=0xffff7fff` disables PP_GFXOFF, keeping the GFX IP powered → elevated idle + S0i3 blocked
+- Root port 0000:00:03.1 forced `power/control=on` → prevents PCIe suspend and dGPU D3cold
+- `amd_pmf` blacklisted unnecessarily — gen 198 (good) runs with it loaded
+- `amd_pstate=passive`, `pci=noaer`, `amd_pmc disable_workarounds` — all diagnostic, all present on bad gens
 
-### When testing a new kernel build
-1. Boot 26.05 generation from bootloader
-2. Check `nvidia-smi` — should work (MSI regression resolved in 26.05)
-3. Check idle battery draw — should be ~5-6W with nothing running
-4. If both pass, switch back to 26.05 as default generation
+Every test since gen 198 carried this residue. Gen 198 never had any of it.
+**Fix:** Remove all diagnostic items. Clean config on 7.0.11 = 5-6W idle, ~8h battery, S0i3 working.
 
-### Config notes for 7.0.5 generation
-`configuration.nix` kernelParams: `iommu=pt acpi_osi=Linux amd_pstate=passive`
-`gpu-offload.nix` extraModprobeConfig: includes `amdgpu ppfeaturemask=0xffff7fff`
-These are safe on 7.0.5 and may improve power on future kernels when the regression is fixed.
+No diagnostic changes remain in configs. See `kernel-power-regression-bug-report.md` for full history.
 
 ## Known changes and why
 
