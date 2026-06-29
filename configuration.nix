@@ -201,9 +201,9 @@ in
 
   # 2026-06-09: Kernel pin removed (step 2 of unpin ladder).
   # Step 1 (clean config + pinned 7.0.5) confirmed 5-6W idle + clean S0i3 suspend.
-  # Now testing 7.0.11 (current channel kernel) with same clean config.
-  # If power is good: remove firmware overlay (step 3), then switch to 26.05 (step 4).
-  boot.kernelPackages = pkgs.linuxKernel.packages.linux_7_0;
+  # 7.0.11 tested successfully — 5-6W idle, ~8h battery, S0i3 working (gen 209).
+  # 2026-06-28: Moved to 7.1 — 7.0.x designated EOL at 7.0.14; 7.1.2 current stable.
+  boot.kernelPackages = pkgs.linuxKernel.packages.linux_7_1;
 
   # 2026-06-09: ALL diagnostic kernel params removed to match gen 198 (the only good gen).
   # Verified via /proc/cmdline that gen 198 boots with NO extra params — no iommu=pt,
@@ -307,8 +307,10 @@ in
   # XDG desktop portals — file pickers, screen sharing, etc. for Wayland apps
   xdg.portal = {
     enable = true;
-    extraPortals = [ pkgs.xdg-desktop-portal-gtk ];
+    extraPortals = [ pkgs.xdg-desktop-portal-gtk pkgs.xdg-desktop-portal-wlr ];
     config.common.default = [ "gtk" ];
+    config.common."org.freedesktop.impl.portal.ScreenCast" = [ "wlr" ];
+    config.common."org.freedesktop.impl.portal.Screenshot" = [ "wlr" ];
   };
 
   # Color management service (colord)
@@ -330,6 +332,13 @@ in
     # use the example session manager (no others are packaged yet so this is enabled by default,
     # no need to redefine it in your config for now)
     #media-session.enable = true;
+
+    extraConfig.pipewire."10-clock-rate" = {
+      "context.properties" = {
+        "default.clock.rate" = 48000;
+        "default.clock.allowed-rates" = [ 44100 48000 88200 96000 176400 192000 ];
+      };
+    };
   };
 
   # Enable touchpad support (enabled default in most desktopManager).
