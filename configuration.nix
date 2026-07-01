@@ -305,6 +305,11 @@ in
   programs.dconf.enable = true;
 
   # XDG desktop portals — file pickers, screen sharing, etc. for Wayland apps
+  # TODO: Remove xdg-desktop-portal-wlr — crashes on every session start (niri uses
+  # ext-screencopy-v1, wlr portal requires wlr-screencopy-unstable-v1; incompatible).
+  # Noctalia GPU Screen Recorder uses -w screen (KMS) and doesn't need the portal to
+  # actually work — only needs a compositor portal running for its preflight check.
+  # Revisit when noctalia 5 lands or a niri-compatible portal exists.
   xdg.portal = {
     enable = true;
     extraPortals = [ pkgs.xdg-desktop-portal-gtk pkgs.xdg-desktop-portal-wlr ];
