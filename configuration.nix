@@ -533,22 +533,16 @@ in
 
   environment.etc."os-release".text = lib.mkForce ''
     NAME="SpectreOS"
-    PRETTY_NAME="SpectreOS 0.1 (Beta)"
+    PRETTY_NAME="SpectreOS"
     ID=spectreos
     ID_LIKE=nixos
-    VERSION="0.1"
-    VERSION_ID="0.1"
-    VERSION_CODENAME=beta
     LOGO="nix-snowflake"
     ANSI_COLOR="0;38;2;126;186;228"
   '';
 
   environment.etc."lsb-release".text = lib.mkForce ''
     DISTRIB_ID=SpectreOS
-    DISTRIB_RELEASE=0.1
-    DISTRIB_CODENAME=beta
-    DISTRIB_DESCRIPTION="SpectreOS 0.1 (Beta)"
-    LSB_VERSION=0.1
+    DISTRIB_DESCRIPTION="SpectreOS"
   '';
 
   system.stateVersion = "25.11"; # Did you read the comment?
