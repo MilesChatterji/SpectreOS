@@ -300,6 +300,17 @@ in
 
   # Enable CUPS to print documents.
   services.printing.enable = true;
+  services.printing.drivers = [
+    pkgs.brgenml1lpr          # Brother generic LPR (covers MFC-L5800DW)
+    pkgs.brgenml1cupswrapper  # Brother generic CUPS wrapper
+  ];
+
+  # mDNS — allows CUPS to discover Brother printers on the local network
+  services.avahi = {
+    enable = true;
+    nssmdns4 = true;
+    openFirewall = true;
+  };
 
   # dconf — required for home-manager GTK/dconf settings activation
   programs.dconf.enable = true;
@@ -360,6 +371,9 @@ in
     #  thunderbird
     ];
   };
+
+  # nix-ld — allows running unpatched non-NixOS binaries
+  programs.nix-ld.enable = true;
 
   # Install firefox.
   programs.firefox.enable = true;
