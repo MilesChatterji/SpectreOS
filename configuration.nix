@@ -203,6 +203,14 @@ in
   # Step 1 (clean config + pinned 7.0.5) confirmed 5-6W idle + clean S0i3 suspend.
   # 7.0.11 tested successfully — 5-6W idle, ~8h battery, S0i3 working (gen 209).
   # 2026-06-28: Moved to 7.1 — 7.0.x designated EOL at 7.0.14; 7.1.2 current stable.
+  # 2026-09-03: Tried 7.2 (7.1.x reached EOL) — reverted. nvidiaPackages.stable
+  # (595.71.05, the only 595.x on the nixos channel for linux_7_2) fails to build:
+  # `nvidia/os-interface.c:732: error: implicit declaration of function 'strncpy'`
+  # against the 7.2.3 kernel headers. nixpkgs-unstable already carries a newer
+  # nvidia stable (595.99.02) but that wasn't verified against the module build
+  # (only the userspace nvidia-x11 package was test-built, not kernelModules).
+  # Staying on 7.1 until either nixos-channel picks up a fixed nvidia build or
+  # the next LTS kernel lands — then move straight to nixos-unstable + LTS.
   boot.kernelPackages = pkgs.linuxKernel.packages.linux_7_1;
 
   # 2026-06-09: ALL diagnostic kernel params removed to match gen 198 (the only good gen).
