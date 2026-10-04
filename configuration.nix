@@ -211,7 +211,18 @@ in
   # (only the userspace nvidia-x11 package was test-built, not kernelModules).
   # Staying on 7.1 until either nixos-channel picks up a fixed nvidia build or
   # the next LTS kernel lands — then move straight to nixos-unstable + LTS.
-  boot.kernelPackages = pkgs.linuxKernel.packages.linux_7_1;
+  # 2026-09-19: linux_7_1 has since been hard-removed upstream (EOL, not just
+  # deprecated — any rebuild against 7.1 now throws). Root-caused via nixpkgs
+  # issue #554125: NVIDIA 595.71.05 never included <string.h> itself and relied
+  # on it being pulled in transitively; the kernel's strncpy->strscpy migration
+  # broke that assumption. Fixed upstream in NVIDIA 595.9x+, but nixpkgs hasn't
+  # backported it to the nixos-26.05 channel's default nvidiaPackages.stable
+  # (issue open a month with no PR). Moving to 7.2 with an explicit NVIDIA
+  # 595.91.07 pin via mkDriver in gpu-offload.nix instead of nvidiaPackages.stable
+  # — verified both the kernel module and userspace package build clean against
+  # this channel's linux_7_2 (7.2.6). Stays entirely on the nixos channel, no
+  # nixos-unstable mixing. See project_kernel7_migration memory for full detail.
+  boot.kernelPackages = pkgs.linuxKernel.packages.linux_7_2;
 
   # 2026-06-09: ALL diagnostic kernel params removed to match gen 198 (the only good gen).
   # Verified via /proc/cmdline that gen 198 boots with NO extra params — no iommu=pt,

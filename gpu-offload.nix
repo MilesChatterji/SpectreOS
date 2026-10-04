@@ -155,7 +155,20 @@ in
     nvidiaSettings = true;
     
     # Follow boot.kernelPackages so the NVIDIA driver always matches the pinned kernel.
-    package = config.boot.kernelPackages.nvidiaPackages.stable;
+    # 2026-09-19: nvidiaPackages.stable on the nixos-26.05 channel is still 595.71.05,
+    # which fails to build against linux_7_2 (nixpkgs #554125 — missing <string.h> for
+    # strncpy, fixed upstream in NVIDIA 595.9x but not yet backported to this channel's
+    # default). Pinning 595.91.07 explicitly via mkDriver instead — verified this exact
+    # version+hash set builds clean (kernel module + userspace) against this channel's
+    # linux_7_2 (7.2.6). Revert to nvidiaPackages.stable once nixpkgs backports the fix.
+    package = config.boot.kernelPackages.nvidiaPackages.mkDriver {
+      version = "595.91.07";
+      sha256_64bit = "sha256-yiPIjdJLB6GRZE4eEc+3vN11NzBXSa9A+YABiwleYxM=";
+      sha256_aarch64 = "sha256-fqkN7ONFXtTeXyu2mQxorrk362Epxq3bz88hhKYQzwQ=";
+      openSha256 = "sha256-OB8Epd+qn/WywxsPiFpxEOAzlJqb6I1SyRoV3a8l71k=";
+      settingsSha256 = "sha256-QzT8Cw1luuZGP9DUje3HN/0ngiayqHURj+bqPsxlJ5w=";
+      persistencedSha256 = "sha256-3JQBaNmkwxvCXv9q8aHKas6VZM/JjLsuilC2t7ET0u0=";
+    };
   };
   
   # Set environment variables for PRIME offloading
