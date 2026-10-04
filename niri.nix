@@ -611,11 +611,22 @@ in
     wantedBy = [ "graphical-session.target" ];
     after = [ "graphical-session.target" ];
     serviceConfig = {
-      # 2026-10-04: v5 is a single compiled binary with its own --daemon flag,
-      # not a quickshell script loaded via `qs -p <dir>`. NOCTALIA_SETTINGS_FALLBACK
-      # was v4-only (pointed at gui-settings.json); v5 uses settings.toml with its
-      # own sane defaults via NOCTALIA_CONFIG_HOME, so that env var is dropped.
-      ExecStart = "${pkgs.noctalia}/bin/noctalia --daemon";
+      # 2026-10-04: v5 is a single compiled binary, not a quickshell script loaded
+      # via `qs -p <dir>`. NOCTALIA_SETTINGS_FALLBACK was v4-only (pointed at
+      # gui-settings.json); v5 uses settings.toml with its own sane defaults via
+      # NOCTALIA_CONFIG_HOME, so that env var is dropped.
+      # 2026-10-04 (same day, after first real boot): dropped --daemon. That flag
+      # forks to the background and exits the parent — fine for a manual terminal
+      # launch (it's what the .desktop file uses), but fatal under a Type=simple
+      # systemd unit (the default, unset here): systemd treats the ExecStart
+      # process as the service, so when the --daemon parent exits "successfully"
+      # after forking, systemd thinks the service stopped and kills the actual
+      # detached child along with it. Confirmed: with --daemon, noctalia fully
+      # initialized (bar, wallpaper, IPC socket, all services) then got killed
+      # seconds later when the parent exited; `noctalia msg status` afterward
+      # reported not running. Running in the foreground (no --daemon) is the
+      # correct pattern for Type=simple.
+      ExecStart = "${pkgs.noctalia}/bin/noctalia";
       Restart = "on-failure";
       Environment = [
         "__GLX_VENDOR_LIBRARY_NAME=mesa"
