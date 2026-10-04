@@ -581,7 +581,7 @@ in
     # Hardware control utilities
     brightnessctl  # For display brightness and keyboard backlight control
     bc  # For floating point calculations in auto-brightness script
-    wlsunset  # For nightlight (blue light filter) functionality
+    # wlsunset removed 2026-10-04 — superseded by Noctalia v5's built-in nightlight
     wlr-randr  # Display configuration tool for Wayland (needed for MST output management)
     enable-mst-outputs  # Script to auto-enable MST outputs on Niri startup
     # Power management
@@ -684,25 +684,15 @@ in
     };
   };
 
-  # Nightlight service using wlsunset
-  # Automatically adjusts screen color temperature based on time of day
-  # Uses location-based sunrise/sunset times or manual schedule
-  systemd.user.services.wlsunset = {
-    description = "wlsunset - Nightlight (blue light filter) for Wayland";
-    wantedBy = [ "graphical-session.target" ];
-    after = [ "graphical-session.target" ];
-    serviceConfig = {
-      Type = "simple";
-      # wlsunset will automatically detect sunrise/sunset times based on location
-      # Default: 6500K (day) to 4000K (night), transitions over 1 hour
-      # You can customize these values or add location with -l LAT,LON
-      ExecStart = "${pkgs.wlsunset}/bin/wlsunset";
-      Restart = "on-failure";
-      RestartSec = 5;
-      # Pass Wayland environment variables
-      PassEnvironment = [ "WAYLAND_DISPLAY" "XDG_RUNTIME_DIR" "XDG_SESSION_TYPE" ];
-    };
-  };
+  # 2026-10-04: Removed the standalone wlsunset nightlight service. Noctalia v5
+  # has its own built-in nightlight (gamma-control=yes logged at startup; see
+  # `noctalia msg nightlight-enable/disable/toggle/force-toggle`), and running
+  # both fought over the same wlr-gamma-control protocol — whichever last wrote
+  # won, with no error on either side, just inconsistent/overridden behavior.
+  # Confirmed wlsunset was actively wrong besides: with no -l LAT,LON configured
+  # it logged "calculated sun trajectory: polar night" and forced night-temp
+  # (4000K) permanently regardless of actual time of day, fighting Noctalia's
+  # own (presumably correct) schedule. Noctalia now owns this exclusively.
 
   # Auto brightness service based on ambient light sensor
   # Polls sensor every 3 seconds and adjusts screen/keyboard brightness
