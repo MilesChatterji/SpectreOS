@@ -151,8 +151,12 @@ let
 
     # Set keyboard backlight (inverted: bright screen = dim keyboard, dim screen = bright keyboard)
     # User preference: Level 1 (first level) for dark conditions, never use brightest settings
-    ${pkgs.brightnessctl}/bin/brightnessctl --class=leds --device=asus::kbd_backlight set "''$TARGET_KBD_BRIGHTNESS" 2>/dev/null || true
-    ${pkgs.noctalia}/bin/noctalia msg keyboard-backlight-osd 2>/dev/null || true
+    # 2026-10-12: skip while reading/tablet mode has the keyboard folded away and backlit for
+    # nothing — see the rotate-toggle keybind in config.kdl, which sets this same flag.
+    if [ ! -f "/tmp/kbd-backlight-auto-disabled" ]; then
+      ${pkgs.brightnessctl}/bin/brightnessctl --class=leds --device=asus::kbd_backlight set "''$TARGET_KBD_BRIGHTNESS" 2>/dev/null || true
+      ${pkgs.noctalia}/bin/noctalia msg keyboard-backlight-osd 2>/dev/null || true
+    fi
   '';
   
   # Helper script to manually set brightness and disable auto-brightness temporarily
