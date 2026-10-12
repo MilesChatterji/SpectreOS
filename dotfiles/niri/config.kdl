@@ -711,6 +711,17 @@ binds {
     // over the same gamma-control protocol). force-toggle overrides the schedule
     // immediately regardless of time of day, matching the old bind's instant-toggle feel.
     Alt+Shift+N { spawn-sh "noctalia msg nightlight-force-toggle"; }
+
+    // 2026-10-12: Reading/tablet-mode toggle. Rotates 90 degrees (confirmed live: niri's
+    // "90" transform matches the desired "turn left" direction for this panel) and kills
+    // the keyboard backlight, since the keyboard is folded away and unusable once rotated
+    // this way. The flag file doubles as both the toggle-state tracker and the suppression
+    // signal auto-brightness-sensor checks before touching the keyboard backlight (see
+    // niri.nix) — its *content* is the keyboard backlight level to restore on toggle-off,
+    // same save/restore idiom as the idle-dim path elsewhere in this file.
+    // Folding the screen alone (no keybind) still works fine for landscape/movie viewing —
+    // this bind is specifically for the portrait reading/note-taking case.
+    Mod+Shift+R hotkey-overlay-title="Toggle Reading/Tablet Mode" { spawn-sh "if [ -f /tmp/kbd-backlight-auto-disabled ]; then niri msg output eDP-1 transform normal; brightnessctl --class=leds --device=asus::kbd_backlight set \"$(cat /tmp/kbd-backlight-auto-disabled)\"; rm -f /tmp/kbd-backlight-auto-disabled; else brightnessctl --class=leds --device=asus::kbd_backlight get > /tmp/kbd-backlight-auto-disabled; niri msg output eDP-1 transform 90; brightnessctl --class=leds --device=asus::kbd_backlight set 0; fi; noctalia msg keyboard-backlight-osd"; }
     Alt+P { spawn "playerctl" "play-pause" ; }
 }
 
