@@ -1,0 +1,187 @@
+{
+  "$schema": "https://github.com/fastfetch-cli/fastfetch/raw/master/doc/json_schema.json",
+  "keyPaddingLeft": 0,
+  "modules": [
+    {
+     "type": "custom",
+      "format": "{#yellow}╭────────────────────────────────────────────────────────────────────────────────────────╮"
+    },
+    {
+      "type": "custom",
+      "format": "{#yellow}│ {#bold_white}Hardware{#yellow}\u001b[134G│"
+    },
+    {
+      "type": "custom",
+      "format": "{#yellow}├────────────────────────────────────────────────────────────────────────────────────────┤"
+    },
+    {
+      "type": "host",
+      "key": "{#yellow}│  Model",
+      "format": "{name} ({version}){#yellow}\u001b[134G│"
+    },
+    {
+      "type": "cpu",
+      "key": "{#yellow}│  CPU",
+      "format": "{name} ({cores-logical}) @ {freq-base}{#yellow}\u001b[134G│"
+    },
+    {
+      "type": "gpu",
+      "key": "{#yellow}│  GPU",
+      "format": "{name} [{type}]{#yellow}\u001b[134G│"
+    },
+    {
+      "type": "memory",
+      "key": "{#yellow}│  Memory",
+      "format": "{used} / {total} ({percentage}){#yellow}\u001b[134G│"
+    },
+    {
+      "type": "disk",
+      "key": "{#yellow}│  Disk",
+      "format": "{size-used} / {size-total} ({size-percentage}) - {filesystem}{#yellow}\u001b[134G│"
+    },
+    {
+      "type": "custom",
+      "format": "{#yellow}╰────────────────────────────────────────────────────────────────────────────────────────╯"
+    },
+    {
+      "type": "custom",
+      "format": "{#yellow}╭────────────────────────────────────────────────────────────────────────────────────────╮"
+    },
+    {
+      "type": "custom",
+      "format": "{#yellow}│ {#bold_white}OS{#yellow}\u001b[134G│"
+    },
+    {
+      "type": "custom",
+      "format": "{#yellow}├────────────────────────────────────────────────────────────────────────────────────────┤"
+    },
+    {
+      "type": "os",
+      "key": "{#yellow}│  OS",
+      "format": "{name} {arch}{#yellow}\u001b[134G│"
+    },
+    {
+      "type": "kernel",
+      "key": "{#yellow}│  Kernel",
+      "format": "{sysname} {release}{#yellow}\u001b[134G│"
+    },
+    {
+      "type": "uptime",
+      "key": "{#yellow}│  Uptime",
+      "format": "{formatted}{#yellow}\u001b[134G│"
+    },
+    {
+      "key": "{#yellow}│  OS Age",
+      "type": "command",
+      "keyColor": "yellow",
+      "format": "{result}{#yellow}\u001b[134G│",
+      "text": "/home/miles/.local/bin/fastfetch-install-date.sh"
+    },
+    {
+      "type": "custom",
+      "format": "{#yellow}╰────────────────────────────────────────────────────────────────────────────────────────╯"
+    },
+    {
+      "type": "custom",
+      "format": "{#yellow}╭────────────────────────────────────────────────────────────────────────────────────────╮"
+    },
+    {
+      "type": "custom",
+      "format": "{#yellow}│ {#bold_white}Terminal{#yellow}\u001b[134G│"
+    },
+    {
+      "type": "custom",
+      "format": "{#yellow}├────────────────────────────────────────────────────────────────────────────────────────┤"
+    },
+    {
+      "type": "terminal",
+      "key": "{#yellow}│  Terminal",
+      "format": "{pretty-name} {version}{#yellow}\u001b[134G│"
+    },
+    {
+      "type": "terminalfont",
+      "key": "{#yellow}│  Terminal Font",
+      "format": "{combined}{#yellow}\u001b[134G│"
+    },
+    {
+      "type": "packages",
+      "key": "{#yellow}│  Packages",
+      "format": "{nix-system} (nix-system), {nix-user} (nix-user){#yellow}\u001b[134G│"
+    },
+    {
+      "type": "shell",
+      "key": "{#yellow}│  Shell",
+      "format": "{exe-name} {version}{#yellow}\u001b[134G│"
+    },
+    {
+      "type": "custom",
+      "format": "{#yellow}╰────────────────────────────────────────────────────────────────────────────────────────╯"
+    },
+    {
+      "type": "custom",
+      "format": "{#yellow}╭────────────────────────────────────────────────────────────────────────────────────────╮"
+    },
+    {
+      "type": "custom",
+      "format": "{#yellow}│ {#bold_white}Desktop{#yellow}\u001b[134G│"
+    },
+    {
+      "type": "custom",
+      "format": "{#yellow}├────────────────────────────────────────────────────────────────────────────────────────┤"
+    },
+    {
+      "type": "de",
+      "key": "{#yellow}│  Desktop Environment",
+      "format": "{pretty-name} {version}{#yellow}\u001b[134G│"
+    },
+    {
+      "type": "wm",
+      "key": "{#yellow}│  Window Manager",
+      "format": "{pretty-name} {version} ({protocol-name}){#yellow}\u001b[134G│"
+    },
+    {
+      "type": "wmtheme",
+      "key": "{#yellow}│  WM Theme",
+      "format": "{result}{#yellow}\u001b[134G│"
+    },
+    {
+      "type": "custom",
+      "format": "{#yellow}╰────────────────────────────────────────────────────────────────────────────────────────╯"
+    },
+    {
+      "type": "custom",
+      "format": "{#yellow}╭────────────────────────────────────────────────────────────────────────────────────────╮"
+    },
+    {
+      "type": "custom",
+      "format": "{#yellow}│ {#bold_white}Network{#yellow}\u001b[134G│"
+    },
+    {
+      "type": "custom",
+      "format": "{#yellow}├────────────────────────────────────────────────────────────────────────────────────────┤"
+    },
+    {
+      "type": "wifi",
+      "key": "{#yellow}│  Wifi Network",
+      "format": "{ssid} - {protocol} - {band} GHz - {security} ({signal-quality}){#yellow}\u001b[134G│"
+    },
+    {
+      "type": "localip",
+      "key": "{#yellow}│  Local IP",
+      "format": "{ipv4}{#yellow}\u001b[134G│"
+    },
+    {
+      "type": "publicip",
+      "key": "{#yellow}│  Public IP",
+      "format": "{ip} ({location}){#yellow}\u001b[134G│"
+    },
+    {
+      "type": "custom",
+      "format": "{#yellow}╰────────────────────────────────────────────────────────────────────────────────────────╯"
+    }
+  ],
+  "logo": {
+    "type": "file-raw",
+    "source": "/home/miles/Pictures/spectre.txt"
+  }
+}
