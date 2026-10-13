@@ -144,7 +144,7 @@ let
     ${pkgs.brightnessctl}/bin/brightnessctl --class=backlight set "''$TARGET_BRIGHTNESS%"
     # Noctalia v5 doesn't passively watch hardware state for its OSD like v4 did —
     # explicitly tell it to show the new level (no value = read live hardware state).
-    ${pkgs.noctalia}/bin/noctalia msg brightness-osd 2>/dev/null || true
+    ${unstable.noctalia}/bin/noctalia msg brightness-osd 2>/dev/null || true
 
     # Save the brightness we just set so we can detect manual changes later
     echo "''$TARGET_BRIGHTNESS" > "''$LAST_AUTO_BRIGHTNESS_FILE" 2>/dev/null || true
@@ -155,7 +155,7 @@ let
     # nothing — see the rotate-toggle keybind in config.kdl, which sets this same flag.
     if [ ! -f "/tmp/kbd-backlight-auto-disabled" ]; then
       ${pkgs.brightnessctl}/bin/brightnessctl --class=leds --device=asus::kbd_backlight set "''$TARGET_KBD_BRIGHTNESS" 2>/dev/null || true
-      ${pkgs.noctalia}/bin/noctalia msg keyboard-backlight-osd 2>/dev/null || true
+      ${unstable.noctalia}/bin/noctalia msg keyboard-backlight-osd 2>/dev/null || true
     fi
   '';
   
@@ -292,11 +292,11 @@ let
   # Integrates with auto-brightness by disabling it during dimming
   swayidle-start = pkgs.writeShellScript "swayidle-start" ''
     ${pkgs.swayidle}/bin/swayidle -w \
-      timeout 180 '${brightness-save-restore}/bin/brightness-save-restore save && touch /tmp/auto-brightness-disabled && ${pkgs.brightnessctl}/bin/brightnessctl --class=backlight set 10% && ${pkgs.noctalia}/bin/noctalia msg brightness-osd || true && KBD_BRIGHTNESS=$(${pkgs.brightnessctl}/bin/brightnessctl --class=leds --device=asus::kbd_backlight get 2>/dev/null || echo "0") && echo "$KBD_BRIGHTNESS" > "$HOME/.cache/niri-kbd-brightness-backup" && ${pkgs.brightnessctl}/bin/brightnessctl --class=leds --device=asus::kbd_backlight set 0 && ${pkgs.noctalia}/bin/noctalia msg keyboard-backlight-osd || true' \
-        resume '${brightness-save-restore}/bin/brightness-save-restore restore && ${pkgs.noctalia}/bin/noctalia msg brightness-osd || true && rm -f /tmp/auto-brightness-disabled && if [ -f "$HOME/.cache/niri-kbd-brightness-backup" ]; then KBD_BRIGHTNESS=$(cat "$HOME/.cache/niri-kbd-brightness-backup"); ${pkgs.brightnessctl}/bin/brightnessctl --class=leds --device=asus::kbd_backlight set "$KBD_BRIGHTNESS" 2>/dev/null || true; ${pkgs.noctalia}/bin/noctalia msg keyboard-backlight-osd || true; rm -f "$HOME/.cache/niri-kbd-brightness-backup"; fi' \
-      timeout 300 '${pkgs.noctalia}/bin/noctalia msg session lock' \
+      timeout 180 '${brightness-save-restore}/bin/brightness-save-restore save && touch /tmp/auto-brightness-disabled && ${pkgs.brightnessctl}/bin/brightnessctl --class=backlight set 10% && ${unstable.noctalia}/bin/noctalia msg brightness-osd || true && KBD_BRIGHTNESS=$(${pkgs.brightnessctl}/bin/brightnessctl --class=leds --device=asus::kbd_backlight get 2>/dev/null || echo "0") && echo "$KBD_BRIGHTNESS" > "$HOME/.cache/niri-kbd-brightness-backup" && ${pkgs.brightnessctl}/bin/brightnessctl --class=leds --device=asus::kbd_backlight set 0 && ${unstable.noctalia}/bin/noctalia msg keyboard-backlight-osd || true' \
+        resume '${brightness-save-restore}/bin/brightness-save-restore restore && ${unstable.noctalia}/bin/noctalia msg brightness-osd || true && rm -f /tmp/auto-brightness-disabled && if [ -f "$HOME/.cache/niri-kbd-brightness-backup" ]; then KBD_BRIGHTNESS=$(cat "$HOME/.cache/niri-kbd-brightness-backup"); ${pkgs.brightnessctl}/bin/brightnessctl --class=leds --device=asus::kbd_backlight set "$KBD_BRIGHTNESS" 2>/dev/null || true; ${unstable.noctalia}/bin/noctalia msg keyboard-backlight-osd || true; rm -f "$HOME/.cache/niri-kbd-brightness-backup"; fi' \
+      timeout 300 '${unstable.noctalia}/bin/noctalia msg session lock' \
       timeout 900 '${brightness-save-restore}/bin/brightness-save-restore save && ${pkgs.systemd}/bin/systemctl suspend' \
-        before-sleep '${pkgs.noctalia}/bin/noctalia msg session lock'
+        before-sleep '${unstable.noctalia}/bin/noctalia msg session lock'
   '';
   
   # Wrapper script for Niri that forces AMD iGPU usage
@@ -568,15 +568,19 @@ in
     unstable.niri
     xwayland-satellite
     # 2026-10-04: Noctalia v4 (noctalia-shell + noctalia-qs) -> v5 (single `noctalia`
-    # package). v5 is now in the nixos-26.05 channel itself, not just unstable — no
-    # unstable. prefix needed. Driven by necessity, not just upgrade appetite: v4's
-    # noctalia-qs depends on `breakpad`, which is broken on nixpkgs-unstable as of
-    # 2026-10-01 (C++ vtable/link error, upstream bug, not ours) and was blocking
-    # every nixos-rebuild switch on this host. v5 has zero breakpad dependency.
-    # IPC syntax changed completely: v4's `qs -p ... ipc call <target> <method>`
-    # became v5's `noctalia msg <command>` — see the swayidle lock command below
-    # and config.kdl's keybinds (not in this repo) for the rebinds this required.
-    noctalia
+    # package). Driven by necessity, not just upgrade appetite: v4's noctalia-qs
+    # depends on `breakpad`, which was broken on nixpkgs-unstable as of 2026-10-01
+    # (C++ vtable/link error, upstream bug, not ours) and was blocking every
+    # nixos-rebuild switch on this host. v5 has zero breakpad dependency on either
+    # channel (checked both before this change). IPC syntax changed completely:
+    # v4's `qs -p ... ipc call <target> <method>` became v5's `noctalia msg
+    # <command>` — see the swayidle lock command below and config.kdl's keybinds
+    # (not in this repo) for the rebinds this required.
+    # 2026-10-12: switched to unstable.noctalia (5.2.1) from the plain nixos-26.05
+    # channel package (5.0.1, stuck there since the channel hasn't picked up a
+    # newer point release) — just to track newer Noctalia releases faster, same
+    # reasoning as niri itself already being pulled from unstable above.
+    unstable.noctalia
     niri-amd-wrapper
     brightness-save-restore
     auto-brightness-sensor  # Auto brightness based on ambient light sensor
@@ -630,7 +634,7 @@ in
       # seconds later when the parent exited; `noctalia msg status` afterward
       # reported not running. Running in the foreground (no --daemon) is the
       # correct pattern for Type=simple.
-      ExecStart = "${pkgs.noctalia}/bin/noctalia";
+      ExecStart = "${unstable.noctalia}/bin/noctalia";
       Restart = "on-failure";
       Environment = [
         "__GLX_VENDOR_LIBRARY_NAME=mesa"
