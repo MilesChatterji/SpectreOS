@@ -161,6 +161,11 @@ in
     # default). Pinning 595.91.07 explicitly via mkDriver instead — verified this exact
     # version+hash set builds clean (kernel module + userspace) against this channel's
     # linux_7_2 (7.2.6). Revert to nvidiaPackages.stable once nixpkgs backports the fix.
+    # 2026-11-03: moved boot.kernelPackages to linux_7_3 (7.2 EOL'd, no 7.x LTS yet).
+    # Re-checked nvidiaPackages.stable first — nixpkgs #554125 is STILL unresolved
+    # months later, same 595.71.05, same strncpy failure, now against 7.3.1 headers.
+    # Re-verified the existing 595.91.07 pin below builds clean (kernel module +
+    # userspace) against 7.3.1 too — no version/hash change needed this round.
     package = config.boot.kernelPackages.nvidiaPackages.mkDriver {
       version = "595.91.07";
       sha256_64bit = "sha256-yiPIjdJLB6GRZE4eEc+3vN11NzBXSa9A+YABiwleYxM=";

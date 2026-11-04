@@ -222,7 +222,14 @@ in
   # — verified both the kernel module and userspace package build clean against
   # this channel's linux_7_2 (7.2.6). Stays entirely on the nixos channel, no
   # nixos-unstable mixing. See project_kernel7_migration memory for full detail.
-  boot.kernelPackages = pkgs.linuxKernel.packages.linux_7_2;
+  # 2026-11-03: linux_7_2 EOL'd upstream; no 7.x LTS has landed yet. Moved to 7.3
+  # (7.3.1). Re-checked nvidiaPackages.stable on this channel first — still the
+  # same unfixed 595.71.05, still hits the identical strncpy build failure against
+  # 7.3.1 headers (nixpkgs #554125 remains unresolved months later). Kept the same
+  # 595.91.07 mkDriver pin from the 7.2 move — re-verified it builds clean (both
+  # kernel module and userspace) against 7.3.1 too, no version bump needed on the
+  # driver side this time.
+  boot.kernelPackages = pkgs.linuxKernel.packages.linux_7_3;
 
   # 2026-06-09: ALL diagnostic kernel params removed to match gen 198 (the only good gen).
   # Verified via /proc/cmdline that gen 198 boots with NO extra params — no iommu=pt,
