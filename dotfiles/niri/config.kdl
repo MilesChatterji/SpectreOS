@@ -721,7 +721,11 @@ binds {
     // same save/restore idiom as the idle-dim path elsewhere in this file.
     // Folding the screen alone (no keybind) still works fine for landscape/movie viewing —
     // this bind is specifically for the portrait reading/note-taking case.
-    Mod+Shift+R hotkey-overlay-title="Toggle Reading/Tablet Mode" { spawn-sh "if [ -f /tmp/kbd-backlight-auto-disabled ]; then niri msg output eDP-1 transform normal; brightnessctl --class=leds --device=asus::kbd_backlight set \"$(cat /tmp/kbd-backlight-auto-disabled)\"; rm -f /tmp/kbd-backlight-auto-disabled; else brightnessctl --class=leds --device=asus::kbd_backlight get > /tmp/kbd-backlight-auto-disabled; niri msg output eDP-1 transform 90; brightnessctl --class=leds --device=asus::kbd_backlight set 0; fi; noctalia msg keyboard-backlight-osd"; }
+    // 2026-11-22: also starts/stops squeekboard (on-screen keyboard) alongside the rotate.
+    // squeekboard auto-shows on any text-field focus — not just touch — but that's fine
+    // here since the trackpad/keyboard aren't in use while folded this way. Solves "search
+    // another YouTube video while lying down" without flipping the screen back just to type.
+    Mod+Shift+R hotkey-overlay-title="Toggle Reading/Tablet Mode" { spawn-sh "if [ -f /tmp/kbd-backlight-auto-disabled ]; then niri msg output eDP-1 transform normal; brightnessctl --class=leds --device=asus::kbd_backlight set \"$(cat /tmp/kbd-backlight-auto-disabled)\"; rm -f /tmp/kbd-backlight-auto-disabled; systemctl --user stop squeekboard; else brightnessctl --class=leds --device=asus::kbd_backlight get > /tmp/kbd-backlight-auto-disabled; niri msg output eDP-1 transform 90; brightnessctl --class=leds --device=asus::kbd_backlight set 0; systemctl --user start squeekboard; fi; noctalia msg keyboard-backlight-osd"; }
     Alt+P { spawn "playerctl" "play-pause" ; }
 }
 

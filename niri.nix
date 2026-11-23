@@ -595,6 +595,12 @@ in
     # Power management
     swayidle  # Wayland idle management daemon for auto-dim, lock, and suspend
     # Note: Using Noctalia Shell's built-in lock screen via IPC instead of swaylock
+    # 2026-11-22: squeekboard on-screen keyboard, started/stopped by the reading/
+    # tablet-mode toggle (Mod+Shift+R) in config.kdl — not autostarted here. It
+    # auto-shows on ANY text-input-v3 focus, which would be annoying during normal
+    # trackpad/keyboard use, but is exactly the wanted behavior while the laptop is
+    # folded into tablet mode (no trackpad/keyboard use happening anyway).
+    squeekboard
   ] ++ pkgs.lib.optionals (pkgs.stdenv.hostPlatform.system == "x86_64-linux") [
     # gpu-screen-recorder is only available on x86_64-linux
     gpu-screen-recorder
@@ -768,6 +774,21 @@ in
     };
   };
   
+  # On-screen keyboard for reading/tablet mode. NOT wantedBy graphical-session.target —
+  # deliberately not autostarted. Started/stopped by the Mod+Shift+R toggle in config.kdl
+  # (systemctl --user start/stop squeekboard) so it's only running while tablet mode is
+  # active, sidestepping squeekboard's real limitation (it shows on ANY text-input-v3
+  # focus, not specifically touch) since no trackpad/keyboard use happens during that mode.
+  systemd.user.services.squeekboard = {
+    description = "Squeekboard on-screen keyboard (reading/tablet mode only)";
+    serviceConfig = {
+      Type = "simple";
+      ExecStart = "${pkgs.squeekboard}/bin/squeekboard";
+      Restart = "no";
+      PassEnvironment = [ "WAYLAND_DISPLAY" "XDG_RUNTIME_DIR" "XDG_SESSION_TYPE" ];
+    };
+  };
+
   # Color profile application service
   # Applies ASUS DCI P3 ICC profile to display for accurate color in DaVinci Resolve
   # Ensures proper color representation for sRGB, Rec709, and 10-bit P3 color spaces
